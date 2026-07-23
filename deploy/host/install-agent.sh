@@ -59,6 +59,7 @@ init_defaults() {
     REGENERATE_ALL_SECRETS=0
     REQUIRE_RCLONE=0
     REQUIRE_DRIVE_CONNECTIVITY=0
+    REQUIRE_DUMP_MOUNT=0
     UNINSTALL_MODE=0
     FIREWALL_MODE_SET=""
     FORCE_REMOVE_FOREIGN_FIREWALL_TABLE=0
@@ -180,6 +181,7 @@ parse_args() {
                 REQUIRE_RCLONE=1
                 shift
                 ;;
+            --require-dump-mount) REQUIRE_DUMP_MOUNT=1; shift ;;
             --force-remove-foreign-firewall-table) FORCE_REMOVE_FOREIGN_FIREWALL_TABLE=1; shift ;;
             --export-dashboard-bundle)
                 require_option_value "$1" "${2-}" || return
@@ -572,6 +574,7 @@ render_firewall() {
     is_ipv6 "$dashboard_ip" && family=ip6
     {
         printf 'table inet proxsync {\n'
+        printf '    comment "managed-by=proxsync;schema=1"\n'
         printf '    chain agent_input {\n'
         printf '        type filter hook input priority filter; policy accept;\n'
         printf '        iifname "lo" tcp dport %s counter accept\n' "$port"
@@ -596,6 +599,49 @@ fi
 cat "$RULES" >>"$tmp"
 nft --check --file "$tmp"
 nft --file "$tmp"
+EOF
+    chmod 0755 "$destination"
+}
+
+render_firewall_verifier() {
+    local destination="$1"
+    cat >"$destination" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+MARKER=/etc/proxsync-agent/firewall-managed.json
+if [[ ! -f "$MARKER" ]]; then
+    printf 'Firewall marker %s not found.\n' "$MARKER" >&2
+    exit 1
+fi
+if [[ "$(stat -c "%U:%a" "$MARKER" 2>/dev/null)" != "root:600" ]]; then
+    printf 'Firewall marker %s has incorrect permissions.\n' "$MARKER" >&2
+    exit 1
+fi
+RULES="$(nft list table inet proxsync 2>/dev/null)" || {
+    printf 'Table inet proxsync is not loaded.\n' >&2
+    exit 1
+}
+grep -q 'comment "managed-by=proxsync;schema=1"' <<<"$RULES" || {
+    printf 'Table inet proxsync is missing managed-by comment.\n' >&2
+    exit 1
+}
+grep -q 'chain agent_input' <<<"$RULES" || {
+    printf 'Table inet proxsync is missing agent_input chain.\n' >&2
+    exit 1
+}
+grep -Eq 'iif(name)? "lo" tcp dport .* accept' <<<"$RULES" || {
+    printf 'Table inet proxsync is missing localhost allow rule.\n' >&2
+    exit 1
+}
+grep -Eq 'saddr .* tcp dport .* accept' <<<"$RULES" || {
+    printf 'Table inet proxsync is missing dashboard allow rule.\n' >&2
+    exit 1
+}
+grep -Eq 'tcp dport .* drop' <<<"$RULES" || {
+    printf 'Table inet proxsync is missing drop rule.\n' >&2
+    exit 1
+}
+exit 0
 EOF
     chmod 0755 "$destination"
 }
@@ -633,12 +679,14 @@ generate_firewall_marker() {
     local hash
     hash="$(sha256sum "$rules_file" | awk '{print $1}')"
     {
-        printf 'schema_version=1\n'
-        printf 'table_family=inet\n'
-        printf 'table_name=proxsync\n'
-        printf 'dashboard_ip=%s\n' "$dashboard_ip"
-        printf 'agent_port=%s\n' "$port"
-        printf 'rules_hash=%s\n' "$hash"
+        printf '{\n'
+        printf '  "schema_version": 1,\n'
+        printf '  "family": "inet",\n'
+        printf '  "table": "proxsync",\n'
+        printf '  "dashboard_ip": "%s",\n' "$dashboard_ip"
+        printf '  "agent_port": %s,\n' "$port"
+        printf '  "rules_sha256": "%s"\n' "$hash"
+        printf '}\n'
     } >"$destination"
 }
 
@@ -647,16 +695,18 @@ build_firewall_transaction() {
     local transaction="$2"
     : >"$transaction"
     if nft list table inet proxsync >/dev/null 2>&1; then
-        local marker_file="/etc/proxsync-agent/firewall-managed"
+        local marker_file="/etc/proxsync-agent/firewall-managed.json"
         if [[ "$FORCE_REMOVE_FOREIGN_FIREWALL_TABLE" -eq 0 ]]; then
             if [[ ! -f "$marker_file" ]]; then
-                die "Refusing to replace table inet proxsync because its ownership cannot be verified (missing marker)."
+                die "Refusing to modify table inet proxsync because it is not verified as ProxSync-managed (missing marker)."
             fi
-            # We could verify more deeply here, but existence of the marker in our private config dir
-            # combined with our installation structure proves ownership.
-            # We verify the table structure loosely to ensure it's not radically different.
-            if ! nft list table inet proxsync | grep -q 'chain agent_input'; then
-                die "Refusing to replace table inet proxsync because its ownership cannot be verified (structure mismatch)."
+            local marker_stat
+            marker_stat="$(stat -c "%U:%a" "$marker_file" 2>/dev/null || true)"
+            if [[ "$marker_stat" != "root:600" ]]; then
+                die "Refusing to modify table inet proxsync because marker file permissions are invalid."
+            fi
+            if ! nft list table inet proxsync | grep -q 'comment "managed-by=proxsync;schema=1"'; then
+                die "Refusing to modify table inet proxsync because it lacks the managed-by comment."
             fi
         fi
         printf 'delete table inet proxsync\n' >>"$transaction"
@@ -736,8 +786,9 @@ begin_transaction() {
     snapshot_path "$UNIT_FILE" agent-unit
     snapshot_path "$FIREWALL_FILE" firewall-file
     snapshot_path "$FIREWALL_LOADER" firewall-loader
+    snapshot_path "/usr/libexec/proxsync-verify-firewall" firewall-verifier
     snapshot_path "$FIREWALL_UNIT" firewall-unit
-    snapshot_path "/etc/proxsync-agent/firewall-managed" firewall-marker
+    snapshot_path "/etc/proxsync-agent/firewall-managed.json" firewall-marker
     snapshot_path "/etc/systemd/system/proxsync-agent.service.d" agent-dropin
     snapshot_path "$RCLONE_CONFIG" rclone-config
     if command -v nft >/dev/null 2>&1 &&
@@ -768,8 +819,9 @@ rollback_on_error() {
         restore_path "$UNIT_FILE" agent-unit
         restore_path "$FIREWALL_FILE" firewall-file
         restore_path "$FIREWALL_LOADER" firewall-loader
+        restore_path "/usr/libexec/proxsync-verify-firewall" firewall-verifier
         restore_path "$FIREWALL_UNIT" firewall-unit
-        restore_path "/etc/proxsync-agent/firewall-managed" firewall-marker
+        restore_path "/etc/proxsync-agent/firewall-managed.json" firewall-marker
         restore_path "/etc/systemd/system/proxsync-agent.service.d" agent-dropin
         restore_path "$RCLONE_CONFIG" rclone-config
         restore_runtime_firewall
@@ -779,13 +831,19 @@ rollback_on_error() {
         fi
         if [[ "$OLD_FIREWALL_ENABLED" -eq 1 ]]; then
             systemctl enable "$FIREWALL_SERVICE" >/dev/null 2>&1
-        else
+        elif [[ "$OLD_FIREWALL_EXISTS" -eq 1 ]]; then
             systemctl disable "$FIREWALL_SERVICE" >/dev/null 2>&1
+        else
+            rm -f "$FIREWALL_FILE" "$FIREWALL_LOADER" "/usr/libexec/proxsync-verify-firewall" "$FIREWALL_UNIT"
+            systemctl daemon-reload
         fi
         if [[ "${OLD_FIREWALL_ACTIVE:-0}" -eq 1 ]]; then
             systemctl start "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
         else
             systemctl stop "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
+        fi
+        if [[ "${OLD_SERVICE_FAILED:-0}" -eq 0 ]]; then
+            systemctl reset-failed "$SERVICE" >/dev/null 2>&1 || true
         fi
         if [[ "$OLD_SERVICE_ENABLED" -eq 1 ]]; then
             systemctl enable "$SERVICE" >/dev/null 2>&1
@@ -869,10 +927,17 @@ def validate_dir(path, name, allow_create=False, safe_paths_only=False):
     if not os.path.isdir(path):
         print(f"Error: {name} '{path}' is not a directory.", file=sys.stderr)
         sys.exit(1)
+    if os.path.islink(path):
+        print(f"Error: {name} '{path}' must not be a symbolic link.", file=sys.stderr)
+        sys.exit(1)
     if not os.access(path, os.W_OK):
         print(f"Error: {name} '{path}' is not writable or is on a read-only filesystem.", file=sys.stderr)
         sys.exit(1)
     st = os.stat(path)
+    if allow_create and os.path.exists(path):
+        if (st.st_mode & 0o777) != 0o700 or st.st_uid != 0:
+            print(f"Error: {name} '{path}' must have 0700 permissions and be owned by root.", file=sys.stderr)
+            sys.exit(1)
     if (st.st_mode & 0o002) and not (st.st_mode & 0o1000):
         print(f"Error: {name} '{path}' is world-writable without sticky bit.", file=sys.stderr)
         sys.exit(1)
@@ -880,6 +945,12 @@ def validate_dir(path, name, allow_create=False, safe_paths_only=False):
 validate_dir(sys.argv[1], "Dump root")
 validate_dir(sys.argv[2], "Temporary directory", allow_create=True, safe_paths_only=True)
 PY
+
+    if [[ "$REQUIRE_DUMP_MOUNT" -eq 1 ]]; then
+        if ! findmnt -M "$DUMP_ROOT" >/dev/null 2>&1 && ! mountpoint -q "$DUMP_ROOT" 2>/dev/null; then
+            die "Dump root '${DUMP_ROOT}' is not an active mountpoint (--require-dump-mount)."
+        fi
+    fi
 
     if [[ ! -d "$TEMP_DIR" ]]; then
         log "Temporary directory '${TEMP_DIR}' does not exist; creating it with 0700 root:root."
@@ -954,13 +1025,13 @@ uninstall() {
     systemctl stop "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
     systemctl disable "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
     if command -v nft >/dev/null 2>&1; then
-        if [[ "$FORCE_REMOVE_FOREIGN_FIREWALL_TABLE" -eq 1 ]] || [[ -f /etc/proxsync-agent/firewall-managed ]]; then
+        if [[ "$FORCE_REMOVE_FOREIGN_FIREWALL_TABLE" -eq 1 ]] || [[ -f /etc/proxsync-agent/firewall-managed.json ]]; then
             nft delete table inet proxsync >/dev/null 2>&1 || true
         else
             warn "Skipping removal of table inet proxsync because ownership could not be verified."
         fi
     fi
-    rm -f "$UNIT_FILE" "$FIREWALL_FILE" "$FIREWALL_LOADER" "$FIREWALL_UNIT"
+    rm -f "$UNIT_FILE" "$FIREWALL_FILE" "$FIREWALL_LOADER" "/usr/libexec/proxsync-verify-firewall" "$FIREWALL_UNIT"
     rm -rf "$INSTALL_DIR" "$CONFIG_DIR" /var/lib/proxsync-agent /var/log/proxsync-agent /etc/systemd/system/proxsync-agent.service.d
     systemctl daemon-reload
     log "Uninstall complete; only ProxSync-managed files and firewall state were removed."
@@ -1066,7 +1137,8 @@ install_agent() {
     local staged_loader="${WORK_DIR}/proxsync-firewall-apply"
     local staged_firewall_unit="${WORK_DIR}/proxsync-firewall.service"
     local verify_firewall_unit="${WORK_DIR}/verify-firewall.service"
-    local staged_firewall_marker="${WORK_DIR}/firewall-managed"
+    local staged_firewall_marker="${WORK_DIR}/firewall-managed.json"
+    local staged_verifier="${WORK_DIR}/proxsync-verify-firewall"
     local staged_agent_dropin_dir="${WORK_DIR}/proxsync-agent.service.d"
     local nft_transaction="${WORK_DIR}/nft-check.nft"
     local old_hmac="" hmac_secret dashboard_cidr
@@ -1093,6 +1165,7 @@ install_agent() {
     if [[ "$FIREWALL_MODE" == managed ]]; then
         render_firewall "$staged_firewall" "$DASHBOARD_IP" "$PORT"
         render_firewall_loader "$staged_loader"
+        render_firewall_verifier "$staged_verifier"
         render_firewall_unit "$staged_firewall_unit"
         generate_firewall_marker "$staged_firewall_marker" "$staged_firewall" "$DASHBOARD_IP" "$PORT"
         validate_firewall_rules "$staged_firewall" "$nft_transaction"
@@ -1105,6 +1178,8 @@ install_agent() {
             printf '[Unit]\n'
             printf 'Requires=proxsync-firewall.service\n'
             printf 'After=proxsync-firewall.service\n'
+            printf '\n[Service]\n'
+            printf 'ExecStartPre=/usr/libexec/proxsync-verify-firewall\n'
         } >"${staged_agent_dropin_dir}/10-firewall.conf"
     fi
 
@@ -1141,8 +1216,9 @@ install_agent() {
         managed)
             atomic_install "$staged_firewall" "$FIREWALL_FILE" 0644
             atomic_install "$staged_loader" "$FIREWALL_LOADER" 0755
+            atomic_install "$staged_verifier" "/usr/libexec/proxsync-verify-firewall" 0755
             atomic_install "$staged_firewall_unit" "$FIREWALL_UNIT" 0644
-            atomic_install "$staged_firewall_marker" "/etc/proxsync-agent/firewall-managed" 0600
+            atomic_install "$staged_firewall_marker" "/etc/proxsync-agent/firewall-managed.json" 0600
             install -d -m 0755 /etc/systemd/system/proxsync-agent.service.d
             atomic_install "${staged_agent_dropin_dir}/10-firewall.conf" "/etc/systemd/system/proxsync-agent.service.d/10-firewall.conf" 0644
             apply_firewall_rules "$staged_firewall"
@@ -1153,12 +1229,12 @@ install_agent() {
         removed)
             systemctl stop "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
             systemctl disable "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
-            if [[ "$FORCE_REMOVE_FOREIGN_FIREWALL_TABLE" -eq 1 ]] || [[ -f /etc/proxsync-agent/firewall-managed ]]; then
+            if [[ "$FORCE_REMOVE_FOREIGN_FIREWALL_TABLE" -eq 1 ]] || [[ -f /etc/proxsync-agent/firewall-managed.json ]]; then
                 nft delete table inet proxsync >/dev/null 2>&1 || true
             else
                 warn "Skipping removal of table inet proxsync because ownership could not be verified."
             fi
-            rm -f "$FIREWALL_FILE" "$FIREWALL_LOADER" "$FIREWALL_UNIT" /etc/proxsync-agent/firewall-managed /etc/systemd/system/proxsync-agent.service.d/10-firewall.conf
+            rm -f "$FIREWALL_FILE" "$FIREWALL_LOADER" "/usr/libexec/proxsync-verify-firewall" "$FIREWALL_UNIT" /etc/proxsync-agent/firewall-managed.json /etc/systemd/system/proxsync-agent.service.d/10-firewall.conf
             ;;
     esac
 

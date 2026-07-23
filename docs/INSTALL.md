@@ -41,6 +41,7 @@ apt install -y python3 python3-venv nodejs npm nginx sqlite3 openssl
 ## 1. Install the Backup Agent (Proxmox host)
 
 ```bash
+git clone https://github.com/stayfr0sty141/proxsync.git
 cd proxsync/deploy/host
 mkdir -m 0700 /root/proxsync-bundle
 ./install-agent.sh \

@@ -60,11 +60,12 @@ ProxSync splits into **two hardened halves** that talk over mutual TLS:
 
 ## 🚀 Quickstart
 
-Two halves, two installers. Run the agent on your Proxmox host first — it prints the mTLS
-credentials the dashboard needs:
+Two halves, two installers. Run the agent on your Proxmox host first — it generates the certificates
+and secret the dashboard needs:
 
 ```bash
 # 1️⃣ On the Proxmox host:
+git clone https://github.com/stayfr0sty141/proxsync.git
 cd proxsync/deploy/host && ./install-agent.sh --agent-ip 10.0.0.10 --dashboard-ip 10.0.0.20
 
 # 2️⃣ In the unprivileged LXC:

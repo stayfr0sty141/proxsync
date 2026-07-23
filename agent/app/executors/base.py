@@ -79,16 +79,23 @@ class ProcessHandle:
 
 def _signal_group(pid: int | None, sig: signal.Signals) -> None:
     """Signal the child's whole process group — vzdump spawns helpers that must die with it."""
-    if pid is None:
+    if pid is None or pid <= 0:
         return
     try:
         pgid = os.getpgid(pid)
         agent_pgid = os.getpgid(0)
         # Never signal our own process group via killpg
         if pgid == agent_pgid:
+            logger.error(
+                "process_group_invariant_failed", pid=pid, pgid=pgid, agent_pgid=agent_pgid
+            )
             os.kill(pid, sig)
         else:
             os.killpg(pgid, sig)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        logger.error("process_group_permission_error", pid=pid, sig=sig)
     except OSError:
         with contextlib.suppress(OSError):
             os.kill(pid, sig)
@@ -199,6 +206,9 @@ class ProcessRunner:
                 logger.error("process_timeout", executable=command[0], timeout=timeout_seconds)
                 await _terminate_process_group(process, self._grace)
                 log_file.write(f"\n[proxsync] terminated after {timeout_seconds}s timeout\n")
+            except asyncio.CancelledError:
+                await _terminate_process_group(process, self._grace)
+                raise
             except BaseException:
                 await _terminate_process_group(process, self._grace)
                 raise
@@ -239,6 +249,9 @@ class ProcessRunner:
         except TimeoutError:
             await _terminate_process_group(process, 2.0)
             raise ExecutionFailed(f"'{command[0]}' timed out after {timeout_seconds}s") from None
+        except asyncio.CancelledError:
+            await _terminate_process_group(process, 2.0)
+            raise
         except BaseException:
             await _terminate_process_group(process, 2.0)
             raise

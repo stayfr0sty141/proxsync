@@ -57,7 +57,7 @@ Two machines: the **agent** on the Proxmox host, the **dashboard** in an LXC.
 
 ## Phase 1 — Install the Backup Agent (on the Proxmox HOST)
 
-> Do the agent **first** — it prints the credentials the dashboard needs.
+> Do the agent **first** — it generates the certificates and HMAC secret the dashboard needs.
 
 ### 1.1 Preconditions
 
