@@ -78,8 +78,8 @@ cd ProxSync/deploy/host && ./install-agent.sh --dashboard-ip 10.0.0.20
 cd ProxSync/deploy/lxc && ./install.sh --server-name proxsync.lan --agent-ip 10.0.0.10
 ```
 
-Full walkthrough — including mTLS credential exchange and PVEAuditor token setup — lives in
-**[docs/INSTALL.md](docs/INSTALL.md)**.
+Full walkthrough — including mTLS credential exchange, PVEAuditor token setup, and
+**rclone Google Drive OAuth login** — lives in **[docs/INSTALL.md](docs/INSTALL.md)**.
 
 ---
 

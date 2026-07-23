@@ -140,15 +140,81 @@ sed -i 's/^PROXSYNC_BOOTSTRAP_ADMIN_PASSWORD=.*/PROXSYNC_BOOTSTRAP_ADMIN_PASSWOR
 
 ## 6. Off-site sync (optional)
 
-Google Drive replication runs on the host via rclone (decision D1). Configure the remote once:
+Google Drive replication runs on the host via rclone (decision D1).
+
+### 6a. Install rclone
 
 ```bash
 # On the Proxmox host:
-rclone config      # create a remote named e.g. "gdrive"
+apt update && apt install -y rclone
+rclone version
 ```
 
-Then set `PROXSYNC_AGENT_ALLOWED_REMOTES=gdrive` in `/etc/proxsync-agent/agent.env` and
-`systemctl restart proxsync-agent`. Enable sync per policy from the dashboard's Settings page.
+### 6b. Authenticate with Google Drive
+
+Run the interactive config wizard. This is a one-time OAuth login — rclone stores the token
+so you never need to log in again:
+
+```bash
+rclone config
+```
+
+| Prompt | Answer |
+|---|---|
+| `n/s/q>` | `n` (new remote) |
+| `name>` | **`gdrive`** (the default remote name ProxSync expects) |
+| `Storage>` | Pick the number for **Google Drive** |
+| `client_id>` | Press Enter (use rclone's built-in OAuth client) |
+| `client_secret>` | Press Enter |
+| `scope>` | `1` — `drive.file` (ProxSync needs write + list + delete) |
+| `root_folder_id>` | Press Enter (use "My Drive" root) |
+| `service_account_file>` | Press Enter (skip) |
+| `Edit advanced config?` | `n` (no) |
+| `Use web browser to authenticate?` | `y` if the host has a browser; `n` if headless (copy the URL to another machine) |
+| `y/e/d>` | `y` (yes, keep the remote) |
+| `e/n/d/r/c/s/q>` | `q` (quit) |
+
+After completing the OAuth flow in your browser, verify the remote works:
+
+```bash
+rclone about gdrive:
+# Expected output: Used / Total / Free + quota info
+
+rclone ls gdrive:
+# Lists files at the root of your Drive (may be empty)
+```
+
+> **Troubleshooting**: If the host is headless (no desktop), choose `n` at the browser
+> prompt. rclone prints a URL — open it on your laptop, sign in to Google, copy the
+> verification code, and paste it back into the terminal. Alternatively, run
+> `rclone authorize "drive"` on a machine *with* a browser and paste the resulting token.
+
+### 6c. Allow-list the remote & enable sync
+
+Set the allow-list in `/etc/proxsync-agent/agent.env`:
+
+```ini
+PROXSYNC_AGENT_ALLOWED_REMOTES=gdrive
+```
+
+Then restart the agent:
+
+```bash
+systemctl restart proxsync-agent
+```
+
+### 6d. Enable in the dashboard
+
+Open the ProxSync web UI, go to **Settings → Google Drive**, and set:
+
+| Setting | Value |
+|---|---|
+| `enabled` | `true` |
+| `remote_name` | `gdrive` |
+| `folder` | `proxsync/dump` (or your preferred path) |
+
+From this point on, any backup policy with sync enabled will automatically push archives
+to Google Drive after the backup completes.
 
 ---
 
