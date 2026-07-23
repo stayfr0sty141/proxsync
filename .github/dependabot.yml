@@ -29,8 +29,29 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/coverage-v8"
+      next:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-config-prettier"
+          - "prettier"
       frontend-minor:
         update-types: [minor, patch]
+        exclude-patterns:
+          - "vitest"
+          - "@vitest/coverage-v8"
+          - "next"
+          - "eslint-config-next"
+          - "eslint"
+          - "eslint-config-prettier"
+          - "prettier"
 
   - package-ecosystem: github-actions
     directory: /
