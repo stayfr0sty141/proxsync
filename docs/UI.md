@@ -54,7 +54,7 @@ timestamps in the configured timezone, with a relative hint (`2 days ago`) as a 
 
 ## 2. Route map
 
-```
+```text
 /login
 /                          Dashboard
 /backups                   History (default landing for operators)
@@ -73,7 +73,7 @@ timestamps in the configured timezone, with a relative hint (`2 days ago`) as a 
 
 ## 3. Shell
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────────────────┐
 │ ▌ProxSync          pve · agent ●online          🔍 ⌘K    🔔 2    ◐    admin ▾       │  56px
 ├──────────────┬─────────────────────────────────────────────────────────────────────┤
@@ -102,7 +102,7 @@ timestamps in the configured timezone, with a relative hint (`2 days ago`) as a 
 
 ## 4. Dashboard
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────────────────┐
 │  Overview                                              [ ⟲ Refresh ]  [ ⛁ Backup Now ]│
 ├──────────────────┬──────────────────┬──────────────────┬───────────────────────────┤
@@ -132,7 +132,7 @@ not polling. "Failed" counts are clickable filters into `/backups`.
 
 ## 5. Backup history
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │ Backup History                                                 [ ⛁ Backup Now ]      │
 │ ┌────────┐┌────────┐┌──────────┐┌─────────┐┌──────────────┐            ┌──────────┐ │
@@ -159,7 +159,7 @@ Failed rows show the error's first line inline on hover; the full log opens in a
 
 ## 6. Manual backup dialog
 
-```
+```text
 ┌──── Backup Now ─────────────────────────────────────────────┐
 │                                                             │
 │ SELECT GUESTS                          17 available         │
@@ -188,7 +188,7 @@ shut down and names the guests affected.
 
 ## 7. Restore wizard — deliberately slow
 
-```
+```text
 Step 1 Select backup   Step 2 Target   Step 3 ► Confirm
 ┌─────────────────────────────────────────────────────────────┐
 │  ⚠  RESTORE WILL OVERWRITE DATA                             │
@@ -219,7 +219,7 @@ banner solid red.
 
 Two-pane, local left, Drive right, with a middle status gutter.
 
-```
+```text
 ┌──── LOCAL /mnt/backup-hdd/dump ────────┬─┬──── gdrive:proxsync/dump ────────────────┐
 │ NAME                     SIZE   DATE   │ │ NAME                     SIZE   DATE     │
 │ vzdump-qemu-101-…zst   8.5 GiB 19 Jul  │=│ vzdump-qemu-101-…zst   8.5 GiB 19 Jul    │
@@ -236,7 +236,7 @@ Gutter glyphs are also filters. Mismatched checksums are `--danger` and offer **
 
 ## 9. Storage monitor
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │ LOCAL HDD  /mnt/backup-hdd                                                          │
 │ ████████████████████████████░░░░░░░░░░░░░  296.4 / 465.7 GiB   63.6 %               │
@@ -264,7 +264,7 @@ Console-style, monospace, virtualised list. Filter bar: category chips
 free text, correlation-id. Clicking a correlation id pivots to every row sharing it — the
 fastest path from "the Sunday job failed" to the exact vzdump stderr line.
 
-```
+```text
 2026-07-19 01:31:44  ERROR  backup   vm/103  vzdump exited 1: VM 103 qmp command 'guest-fsfreeze-freeze' failed  ⧉3f1c…
 2026-07-19 01:31:44  INFO   notify   telegram → chat -100123 · backup_failed · sent
 2026-07-19 02:14:02  WARN   upload   lxc/108 attempt 2/3 after 429 rate-limit, retry in 60s

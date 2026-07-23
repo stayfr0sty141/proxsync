@@ -9,7 +9,7 @@
 
 [Unit]
 Description=ProxSync Dashboard API
-Documentation=https://github.com/ProxSync/ProxSync
+Documentation=https://github.com/stayfr0sty141/proxsync
 After=network-online.target
 Wants=network-online.target
 

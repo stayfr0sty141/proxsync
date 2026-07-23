@@ -5,12 +5,12 @@ Two separate APIs: the **Dashboard API** (consumed by the browser) and the **Age
 
 ---
 
-# Part 1 — Dashboard API
+## Part 1 — Dashboard API
 
 Base path `/api/v1`. JSON only. OpenAPI served at `/api/v1/openapi.json`
 (behind auth in production).
 
-## Conventions
+### Conventions
 
 **Errors** — RFC 9457 problem details:
 
@@ -42,10 +42,10 @@ token revokes the family. Cookie-authenticated mutations additionally require th
 **Idempotency** — mutating endpoints that spawn work (`/backups/run`, `/restores`,
 `/sync/upload`) accept `Idempotency-Key`; a repeat within 24 h returns the original response.
 
-## 1. Auth
+### 1. Auth
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | POST | `/auth/login` | — | Rate-limited 5/15 min per IP+username, exponential lockout. Returns access token + sets refresh & CSRF cookies |
 | POST | `/auth/refresh` | — | Rotates the refresh token |
 | POST | `/auth/logout` | V | Revokes the current token family |
@@ -53,7 +53,7 @@ token revokes the family. Cookie-authenticated mutations additionally require th
 | POST | `/auth/change-password` | V | Requires current password; revokes all other sessions |
 | GET | `/auth/sessions` · DELETE `/auth/sessions/{id}` | V | Active refresh-token families |
 
-## 2. Dashboard
+### 2. Dashboard
 
 `GET /dashboard/summary` (V) — single call backing the whole landing page:
 
@@ -75,18 +75,18 @@ token revokes the family. Cookie-authenticated mutations additionally require th
 
 `GET /dashboard/activity?limit=20` (V) — merged recent backup/restore/sync events.
 
-## 3. Guests
+### 3. Guests
 
 | Method | Path | Role | Description |
-|---|---|---|---|
-| GET | `/guests` | V | `?type=vm|lxc&status=&search=&backup_enabled=` |
+| --- | --- | --- | --- |
+| GET | `/guests` | V | `?type=vm\|lxc&status=&search=&backup_enabled=` |
 | POST | `/guests/refresh` | O | Force a PVE inventory sync |
 | PATCH | `/guests/{id}` | A | Toggle `backup_enabled` (the allow-list) |
 
-## 4. Backup jobs (schedules)
+### 4. Backup jobs (schedules)
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/backup-jobs` | V | |
 | POST | `/backup-jobs` | A | Cron validated server-side; `next_run_at` returned |
 | GET/PUT/DELETE | `/backup-jobs/{id}` | V/A/A | |
@@ -126,14 +126,14 @@ Create payload:
 }
 ```
 
-## 5. Manual backup & history
+### 5. Manual backup & history
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | POST | `/backups/run` | O | **Backup Now** — `{ targets: [{vmid, guest_type}], mode, compression, storage, upload }` |
 | GET | `/backups` | V | Filters: `vmid, guest_type, status, upload_status, from, to, search`; sortable |
 | GET | `/backups/{id}` | V | Full detail incl. checksum and remote state |
-| DELETE | `/backups/{id}` | A | `?scope=local|remote|both`; refuses if a restore references it |
+| DELETE | `/backups/{id}` | A | `?scope=local\|remote\|both`; refuses if a restore references it |
 | GET | `/backups/{id}/log` | V | Agent task log, `?tail=500` or full |
 | GET | `/backups/{id}/download` | O | Streamed via the agent, `Content-Disposition: attachment`; range requests supported |
 | POST | `/backups/{id}/upload` | O | Manual upload / retry; `{ "force": false }`. Returns 202 and the queued `sync_task` |
@@ -143,7 +143,7 @@ Create payload:
 | GET | `/runs/{id}/backups` | V | The artifacts one run produced |
 | POST | `/runs/{id}/cancel` | O | |
 
-### Retention preview
+#### Retention preview
 
 `POST /retention/preview` (A) evaluates retention against the current database without
 changing it. `POST` is used because the settings screen can send proposed, unsaved values:
@@ -207,10 +207,10 @@ to a job use that job's current counts; a source-less run whose provenance can n
 proven stops fail-closed and records skipped decisions instead of guessing a destructive
 policy.
 
-## 6. Restore (two-phase)
+### 6. Restore (two-phase)
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | POST | `/restores/preflight` | O | Runs every check and writes nothing. A blocking report is a **200**, not an error |
 | POST | `/restores` | O | 201; creates `pending_confirmation` + returns the token once (TTL 5 min) |
 | POST | `/restores/{id}/confirm` | O | 202; body must echo `confirmation_token` **and** `target_vmid` |
@@ -291,10 +291,10 @@ over a running one is the worst outcome available. Cancelling a `running` restor
 agent to stop it; the row becomes terminal when the agent reports back, because only the agent
 knows whether the process died before or after it began rewriting the guest.
 
-## 7. Google Drive sync
+### 7. Google Drive sync
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/sync/status` | V | Queue depth, the transfer in flight, and how many backups await one |
 | GET | `/sync/tasks` | V | Recent transfers with attempt counts and `next_retry_at` |
 | GET | `/sync/quota` | V | Remote quota. Never 5xx: an unreachable remote returns `configured: true` with a `detail` |
@@ -306,10 +306,10 @@ knows whether the process died before or after it began rewriting the guest.
 | POST | `/sync/tasks/{id}/cancel` · `/retry` | O | |
 | POST | `/sync/test-connection` | A | Validates remote name and credentials via the agent |
 
-## 8. Backup browser
+### 8. Backup browser
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/browser/local` | V | Artifacts on the HDD, read from the agent — including ones ProxSync did not create, because they occupy real space |
 | GET | `/browser/remote` | V | Artifacts on the remote |
 | GET | `/browser/compare` | V | `in_sync` / `local_only` / `remote_only` / `size_mismatch`. When the remote cannot be listed the counts are zero and `detail` says why — a partial answer must never read as "everything is in sync" |
@@ -317,10 +317,10 @@ knows whether the process died before or after it began rewriting the guest.
 | GET | `/browser/remote?path=` | V | Same shape from the rclone remote |
 | GET | `/browser/compare` | V | Local-only / remote-only / both / mismatched checksum |
 
-## 9. Storage
+### 9. Storage
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/storage` | V | Live local + remote usage, per-storage breakdown |
 | GET | `/storage/history?days=30` | V | `storage_snapshots` series for the chart |
 | GET | `/storage/forecast` | V | Estimated days until full, based on the trailing 30-day slope |
@@ -350,16 +350,16 @@ stable/declining. `GET /storage/by-guest` sums successful, undeleted local backu
 sizes by `(vmid, guest_type)` and uses the newest eligible backup's name, so VM/LXC identity
 and guest renames are handled deterministically.
 
-## 10. Notifications
+### 10. Notifications
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET/PUT | `/settings/telegram` | A | Bot token write-only; reads return `"configured": true` and a masked hint |
 | POST | `/notifications/telegram/test` | A | Sends a test message now and returns the Telegram API result verbatim |
 | GET | `/notifications` | V | Outbox; `?status=&event_type=&channel=&from=&to=&limit=&offset=` |
 | POST | `/notifications/{id}/resend` | A | 202; requeues a `failed`, `suppressed` or already-`sent` message |
 
-### The outbox
+#### The outbox
 
 Every notification row is written **in the same transaction as the state change it
 describes**, then delivered by a worker. A Telegram outage delays messages and never loses
@@ -379,10 +379,10 @@ Telegram's own `parameters.retry_after` when it sends one), while `400 chat not 
 retrying cannot save a message when no bot token is stored, and `resend` is the way back once
 one is.
 
-### Events and de-duplication
+#### Events and de-duplication
 
 | Event | Fires | Key |
-|---|---|---|
+| --- | --- | --- |
 | `backup_started` | once per run, when it is claimed | `run:{id}:started` |
 | `backup_success` | once per run, all guests succeeded | `run:{id}:backup_success` |
 | `backup_failed` | once per run, any guest failed — a *partial* run reports here, naming the guests that failed | `run:{id}:backup_failed` |
@@ -410,7 +410,7 @@ Each event has a per-event toggle in `/settings/telegram` (`notify_backup_starte
 disabled event writes no row at all: an outbox entry for something the operator asked never to
 hear about would be a queue that never drains.
 
-### `POST /notifications/telegram/test`
+#### POST /notifications/telegram/test
 
 ```json
 { "chat_id": "-1001234567890" }
@@ -438,16 +438,16 @@ problem response would hide the one field worth reading. A genuine request error
 saved, no chat id — is still a 400. Either way the attempt is recorded in the outbox as a
 `test` row with its real outcome.
 
-## 11. Settings
+### 11. Settings
 
 `GET /settings` (A) returns all sections; `GET/PUT /settings/{section}` for
 `general | gdrive | telegram | retention | agent | proxmox`. Secrets are write-only.
 `POST /settings/agent/test` and `POST /settings/proxmox/test` validate connectivity before save.
 
-## 12. Logs
+### 12. Logs
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/logs` | V | `?category=&level=&from=&to=&search=&correlation_id=&backup_id=&restore_id=&limit=&offset=` |
 | GET | `/logs/export` | A | `?format=ndjson\|csv` plus the same filters; streamed as an attachment |
 | GET | `/audit` | A | `?action=&result=&user_id=&from=&to=&search=&correlation_id=&limit=&offset=` |
@@ -485,10 +485,10 @@ offset — an export runs while the sink is still writing, and an offset would s
 rows as the set shifts underneath it. CSV always carries its header row, including when the
 result is empty, so the file opens as a table rather than as nothing at all.
 
-## 13. System & live updates
+### 13. System & live updates
 
 | Method | Path | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/health` | — | Liveness; no auth, no detail |
 | GET | `/health/detail` | A | DB, agent, PVE, and runner/scheduler/sync/retention/storage/notification/log-writer state; sampler errors, stale samples, failing delivery and dropped log entries degrade health |
 | GET | `/events/stream` | V | **SSE**: `stream.open`, `backup.progress`, `backup.state`, `run.state`, `job.state`, `inventory.updated`, sync events, `storage.update`, `restore.state`, `restore.progress` and `notification.state` |
@@ -500,14 +500,14 @@ stops reading loses its oldest events rather than stalling the backup that produ
 
 SSE frame:
 
-```
+```text
 event: backup.progress
 data: {"backup_id":812,"vmid":101,"percent":42,"bytes":12884901888,"eta_seconds":310,"status":"running"}
 ```
 
 ---
 
-# Part 2 — Agent API
+## Part 2 — Agent API
 
 Runs on the Proxmox host. Reachable only from the dashboard LXC address.
 Auth on **every** request: mTLS client certificate **plus** headers
@@ -515,9 +515,9 @@ Auth on **every** request: mTLS client certificate **plus** headers
 where the signature is `HMAC-SHA256(secret, "{method}|{path}|{timestamp}|{nonce}|{sha256(body)}")`.
 Timestamps outside ±60 s are rejected; nonces are cached for the window.
 
-## Core endpoints (as specified in the brief)
+### Core endpoints (as specified in the brief)
 
-### `POST /backup/start`
+#### POST /backup/start
 
 ```jsonc
 { "vmid": 101, "guest_type": "vm", "mode": "snapshot", "compression": "zstd",
@@ -536,7 +536,7 @@ Validation: `vmid` ∈ live PVE inventory ∩ allow-list · `guest_type` matches
 Executes `["vzdump", "101", "--mode", "snapshot", "--compress", "zstd", "--storage",
 "backup-hdd", ...]` — an argv list, never a string.
 
-### `POST /restore/vm`
+#### POST /restore/vm
 
 ```jsonc
 { "archive": "vzdump-qemu-101-2026_07_19-01_00_04.vma.zst",
@@ -554,12 +554,12 @@ re-checked for containment after `realpath`. Refuses when the target exists and 
 is false, or when the target is running and `force_stop` is false.
 Executes `qmrestore`.
 
-### `POST /restore/lxc`
+#### POST /restore/lxc
 
 Same shape; executes `pct restore <vmid> <archive> --storage <storage>`.
 Additional guard: LXC restore to an existing unprivileged container requires `overwrite`.
 
-### `GET /backup/list`
+#### GET /backup/list
 
 `?storage=backup-hdd&vmid=&guest_type=` →
 
@@ -573,7 +573,7 @@ Additional guard: LXC restore to an existing unprivileged container requires `ov
 
 Checksums are computed lazily and cached in a sidecar `.sha256` file next to the artifact.
 
-### `GET /task/{id}`
+#### GET /task/{id}
 
 ```json
 { "task_id": "9a7e…", "kind": "backup", "state": "running",
@@ -600,19 +600,19 @@ for API-initiated tasks. The agent's own `task_id` is the correlation handle.
 `GET /task/{id}/log?tail=500&follow=false` streams the task log (SSE when `follow=true`).
 `POST /task/{id}/cancel` sends SIGTERM, then SIGKILL after a grace period.
 
-### `DELETE /backup/{id}`
+#### DELETE /backup/{id}
 
 `{id}` is the artifact basename. Deletes the artifact plus its `.notes`, `.log` and `.sha256`
 sidecars. The filename must match the vzdump pattern
 `vzdump-(qemu|lxc)-\d+-\d{4}_\d{2}_\d{2}-\d{2}_\d{2}_\d{2}\.(vma|tar)(\.(zst|gz|lzo))?` and
 resolve inside the dump root. Anything else is a 400 — never a deletion.
 
-## Extension endpoints (decision D1/D2)
+### Extension endpoints (decision D1/D2)
 
 Required by features 5, 9 and 12; each is typed and validated exactly like the core set.
 
 | Method | Path | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | POST | `/sync/upload` | `{ filename, remote, remote_path, bwlimit_kbps, transfers, retries }` → task id. Executes `rclone copy` with argv list |
 | POST | `/sync/download` | Pull an artifact back from the remote |
 | POST | `/sync/verify` | `rclone check` / `hashsum` → per-file match report |
@@ -623,10 +623,10 @@ Required by features 5, 9 and 12; each is typed and validated exactly like the c
 | GET | `/health` | Version, uptime, concurrency, rclone/vzdump availability |
 | GET | `/inventory` | Guest list — **only if D2 chooses the agent over the PVE API** |
 
-## Agent status codes
+### Agent status codes
 
 | Code | Meaning |
-|---|---|
+| --- | --- |
 | 202 | Task accepted, `task_id` returned |
 | 400 | Validation failure (bad vmid, mode, path, filename pattern) |
 | 401 | Signature/certificate/clock failure |
@@ -637,7 +637,7 @@ Required by features 5, 9 and 12; each is typed and validated exactly like the c
 
 ---
 
-## Agent sync endpoints (M4)
+### Agent sync endpoints (M4)
 
 `POST /sync/upload` · `/sync/download` · `/sync/verify` · `/sync/delete`,
 `GET /sync/list` · `/sync/about`.
@@ -659,7 +659,7 @@ in as well as out, so a tampered remote cannot write outside it.
 `POST /sync/verify` is synchronous and returns an `outcome`:
 
 | Outcome | Meaning |
-|---|---|
+| --- | --- |
 | `match` | Size and MD5 both agree. The only value that counts as verified |
 | `size_mismatch` | Different lengths |
 | `hash_mismatch` | Same length, different MD5 — the remote copy is corrupt |

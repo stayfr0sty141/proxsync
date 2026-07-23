@@ -11,7 +11,7 @@
 
 [Unit]
 Description=ProxSync Web UI (Next.js)
-Documentation=https://github.com/ProxSync/ProxSync
+Documentation=https://github.com/stayfr0sty141/proxsync
 After=network-online.target
 Wants=network-online.target
 

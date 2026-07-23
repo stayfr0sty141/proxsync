@@ -6,7 +6,7 @@
 # credentials the dashboard needs. Safe to re-run: existing keys and secrets are preserved
 # unless --regenerate-secrets is passed.
 #
-#   ./install-agent.sh --dashboard-ip 10.0.0.20 [--dump-root /mnt/backup-hdd/dump]
+#   ./install-agent.sh --agent-ip 10.10.10.2 --dashboard-ip 10.10.10.104 [--agent-port 8443]
 #
 set -euo pipefail
 
@@ -17,12 +17,17 @@ ENV_FILE="${CONFIG_DIR}/agent.env"
 UNIT_FILE=/etc/systemd/system/proxsync-agent.service
 SERVICE=proxsync-agent
 
+AGENT_IP=""
 DASHBOARD_IP=""
+AGENT_DNS=""
 DUMP_ROOT=/mnt/backup-hdd/dump
 TEMP_DIR=/mnt/backup-hdd/tmp
 BACKUP_STORAGE=backup-hdd
 PORT=8765
+MEMORY_HIGH=1G
+MEMORY_MAX=2G
 REGENERATE=0
+FORCE_IP=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -32,27 +37,86 @@ warn() { printf '\033[0;33m[proxsync]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[0;31m[proxsync]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
-    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
+    cat <<EOF
+ProxSync Host Agent Installer
+
+Usage:
+  ./install-agent.sh --agent-ip <IP> --dashboard-ip <IP> [OPTIONS]
+
+Required Parameters:
+  --dashboard-ip <IP>    IPv4/IPv6 address of the ProxSync Dashboard LXC.
+
+Options:
+  --agent-ip <IP>        Explicit IP address of this agent host interface.
+  --agent-port <PORT>    Port for agent service (default: 8765).
+  --port <PORT>          Alias for --agent-port.
+  --agent-dns <NAME>     Host FQDN/DNS name for TLS certificate SAN (default: hostname).
+  --dump-root <PATH>     Directory path for backup dumps (default: /mnt/backup-hdd/dump).
+  --temp-dir <PATH>      Directory path for temporary files (default: /mnt/backup-hdd/tmp).
+  --backup-storage <NAME> PVE storage identifier (default: backup-hdd).
+  --memory-high <LIMIT>  Systemd cgroup MemoryHigh limit (default: 1G).
+  --memory-max <LIMIT>   Systemd cgroup MemoryMax limit (default: 2G).
+  --force-ip             Skip checking whether --agent-ip exists on host interfaces.
+  --regenerate-secrets   Regenerate PKI certificates and HMAC secret.
+  -h, --help             Show this help message.
+EOF
     exit 0
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --agent-ip)            AGENT_IP="$2"; shift 2 ;;
         --dashboard-ip)        DASHBOARD_IP="$2"; shift 2 ;;
+        --agent-port|--port)   PORT="$2"; shift 2 ;;
+        --agent-dns)           AGENT_DNS="$2"; shift 2 ;;
         --dump-root)           DUMP_ROOT="$2"; shift 2 ;;
         --temp-dir)            TEMP_DIR="$2"; shift 2 ;;
         --backup-storage)      BACKUP_STORAGE="$2"; shift 2 ;;
-        --port)                PORT="$2"; shift 2 ;;
+        --memory-high)         MEMORY_HIGH="$2"; shift 2 ;;
+        --memory-max)          MEMORY_MAX="$2"; shift 2 ;;
+        --force-ip)            FORCE_IP=1; shift ;;
         --regenerate-secrets)  REGENERATE=1; shift ;;
         -h|--help)             usage ;;
         *) die "Unknown option: $1 (try --help)" ;;
     esac
 done
 
-# ---- Preflight -------------------------------------------------------------
+# ---- Helpers & Validation --------------------------------------------------
+is_valid_ip() {
+    local ip="$1"
+    python3 -c "import ipaddress, sys; sys.exit(0 if ipaddress.ip_address(sys.argv[1]) else 1)" "$ip" 2>/dev/null
+}
+
+get_host_ips() {
+    python3 -c '
+import subprocess, re
+ips = []
+try:
+    out = subprocess.check_output(["ip", "-o", "addr", "show", "up", "scope", "global"], text=True)
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 4:
+            ip = parts[3].split("/")[0]
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+except Exception:
+    pass
+if not ips:
+    try:
+        out = subprocess.check_output(["hostname", "-I"], text=True)
+        for ip in out.split():
+            if ip not in ips and not ip.startswith("127."):
+                ips.append(ip)
+    except Exception:
+        pass
+print(" ".join(ips))
+'
+}
+
+# ---- Preflight Checks -------------------------------------------------------
 [[ $EUID -eq 0 ]] || die "Run as root."
 [[ -n "$DASHBOARD_IP" ]] || die "--dashboard-ip is required (the ProxSync LXC address)."
-[[ "$DASHBOARD_IP" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "--dashboard-ip must be an IPv4 address."
+is_valid_ip "$DASHBOARD_IP" || die "--dashboard-ip must be a valid IPv4 or IPv6 address."
 
 command -v vzdump  >/dev/null || die "vzdump not found. This script must run on a Proxmox VE host."
 command -v openssl >/dev/null || die "openssl is required."
@@ -63,6 +127,47 @@ if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)';
     die "Python ${PYTHON_VERSION} found; the agent requires 3.11 or newer."
 fi
 log "Python ${PYTHON_VERSION} detected."
+
+# IP Selection Logic
+HOST_IPS=($(get_host_ips))
+
+if [[ -n "$AGENT_IP" ]]; then
+    is_valid_ip "$AGENT_IP" || die "--agent-ip '$AGENT_IP' is not a valid IPv4/IPv6 address."
+    if [[ $FORCE_IP -eq 0 ]]; then
+        FOUND=0
+        for host_ip in "${HOST_IPS[@]}"; do
+            if [[ "$host_ip" == "$AGENT_IP" ]]; then
+                FOUND=1
+                break
+            fi
+        done
+        if [[ $FOUND -eq 0 ]]; then
+            warn "Available host IPs: ${HOST_IPS[*]:-none}"
+            die "Agent IP '$AGENT_IP' was not found on host interfaces. Use --force-ip to override if intentional."
+        fi
+    fi
+else
+    if [[ ${#HOST_IPS[@]} -eq 1 ]]; then
+        AGENT_IP="${HOST_IPS[0]}"
+        log "Auto-detected agent IP: ${AGENT_IP}"
+    elif [[ ${#HOST_IPS[@]} -gt 1 ]]; then
+        warn "Multiple network interfaces / IP addresses detected on host:"
+        for candidate in "${HOST_IPS[@]}"; do
+            warn "  - ${candidate}"
+        done
+        die "Multiple candidate IPs found. You must explicitly pass --agent-ip <IP> to select the correct interface."
+    else
+        die "No active non-loopback network interface detected. Specify --agent-ip <IP> explicitly."
+    fi
+fi
+
+if [[ -z "$AGENT_DNS" ]]; then
+    AGENT_DNS="$(hostname -f 2>/dev/null || hostname)"
+fi
+
+log "Agent IP: ${AGENT_IP}"
+log "Agent DNS: ${AGENT_DNS}"
+log "Dashboard IP: ${DASHBOARD_IP}"
 
 [[ -d "$DUMP_ROOT" ]] || die "Dump root ${DUMP_ROOT} does not exist. Create and mount it first."
 
@@ -96,24 +201,20 @@ log "Installing dependencies"
 
 # ---- PKI -------------------------------------------------------------------
 generate_pki() {
-    local hostname_fqdn host_ip
-    hostname_fqdn="$(hostname -f 2>/dev/null || hostname)"
-    host_ip="$(hostname -I | awk '{print $1}')"
-
     log "Generating certificate authority"
     openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
         -keyout "${TLS_DIR}/ca.key" -out "${TLS_DIR}/ca.crt" \
         -subj "/CN=ProxSync Agent CA/O=ProxSync" 2>/dev/null
 
-    log "Generating server certificate for ${hostname_fqdn} (${host_ip})"
+    log "Generating server certificate for ${AGENT_DNS} (${AGENT_IP})"
     openssl req -newkey rsa:2048 -sha256 -nodes \
         -keyout "${TLS_DIR}/server.key" -out "${TLS_DIR}/server.csr" \
-        -subj "/CN=${hostname_fqdn}/O=ProxSync" 2>/dev/null
+        -subj "/CN=${AGENT_DNS}/O=ProxSync" 2>/dev/null
     openssl x509 -req -in "${TLS_DIR}/server.csr" -days 3650 -sha256 \
         -CA "${TLS_DIR}/ca.crt" -CAkey "${TLS_DIR}/ca.key" -CAcreateserial \
         -out "${TLS_DIR}/server.crt" \
         -extfile <(printf 'subjectAltName=DNS:%s,IP:%s,IP:127.0.0.1\nextendedKeyUsage=serverAuth\n' \
-                   "$hostname_fqdn" "$host_ip") 2>/dev/null
+                   "$AGENT_DNS" "$AGENT_IP") 2>/dev/null
 
     log "Generating client certificate for the dashboard"
     openssl req -newkey rsa:2048 -sha256 -nodes \
@@ -138,13 +239,12 @@ fi
 # ---- Configuration ---------------------------------------------------------
 if [[ -f "$ENV_FILE" ]] && [[ $REGENERATE -eq 0 ]]; then
     log "Reusing existing ${ENV_FILE}"
-    HMAC_SECRET="$(grep -E '^PROXSYNC_AGENT_HMAC_SECRET=' "$ENV_FILE" | cut -d= -f2-)"
 else
     HMAC_SECRET="$(openssl rand -hex 32)"
     log "Writing ${ENV_FILE}"
     cat > "$ENV_FILE" <<EOF
 # Generated by install-agent.sh on $(date -Is)
-PROXSYNC_AGENT_BIND_HOST=0.0.0.0
+PROXSYNC_AGENT_BIND_HOST=${AGENT_IP}
 PROXSYNC_AGENT_BIND_PORT=${PORT}
 PROXSYNC_AGENT_LOG_LEVEL=INFO
 PROXSYNC_AGENT_LOG_JSON=true
@@ -177,7 +277,8 @@ chmod 0640 "$ENV_FILE"
 
 # ---- systemd ---------------------------------------------------------------
 log "Installing systemd unit"
-sed "s|IPAddressAllow=10\.0\.0\.20/32|IPAddressAllow=${DASHBOARD_IP}/32|" \
+sed -e "s|MemoryHigh=.*|MemoryHigh=${MEMORY_HIGH}|" \
+    -e "s|MemoryMax=.*|MemoryMax=${MEMORY_MAX}|" \
     "${SCRIPT_DIR}/proxsync-agent.service" > "$UNIT_FILE"
 chmod 0644 "$UNIT_FILE"
 
@@ -186,35 +287,94 @@ systemctl enable "$SERVICE" >/dev/null
 systemctl restart "$SERVICE"
 
 sleep 2
-if ! systemctl is-active --quiet "$SERVICE"; then
-    warn "The service did not start. Recent log output:"
+
+# ---- Post-Install Verification & Health Checks -----------------------------
+log "Running post-install health checks..."
+HEALTH_PASSED=1
+
+# Check 1: Systemd Service Active
+if systemctl is-active --quiet "$SERVICE"; then
+    log "  [PASS] Service '$SERVICE' is active and running."
+else
+    warn "  [FAIL] Service '$SERVICE' failed to start."
     journalctl -u "$SERVICE" -n 30 --no-pager >&2
-    die "Installation failed."
+    HEALTH_PASSED=0
 fi
 
-# ---- Summary ---------------------------------------------------------------
-HOST_IP="$(hostname -I | awk '{print $1}')"
+# Check 2: Certificate SAN Validation
+if openssl x509 -in "${TLS_DIR}/server.crt" -noout -text 2>/dev/null | grep -q "IP Address:${AGENT_IP}"; then
+    log "  [PASS] Certificate SAN contains agent IP ${AGENT_IP}."
+else
+    warn "  [FAIL] Certificate SAN missing agent IP ${AGENT_IP}."
+    HEALTH_PASSED=0
+fi
+
+# Check 3: Rclone Binary Presence
+if command -v rclone >/dev/null 2>&1; then
+    log "  [PASS] rclone binary is installed."
+else
+    warn "  [WARN] rclone binary is not installed on host. Offsite Google Drive syncs require rclone."
+fi
+
+# Check 4: Outbound DNS & HTTPS for Google Drive
+if python3 -c "import socket; socket.gethostbyname('drive.googleapis.com')" >/dev/null 2>&1; then
+    log "  [PASS] DNS resolution for drive.googleapis.com succeeded."
+else
+    warn "  [WARN] DNS resolution for drive.googleapis.com failed. Check host DNS settings."
+fi
+
+if python3 -c "import socket; socket.create_connection(('drive.googleapis.com', 443), timeout=3).close()" >/dev/null 2>&1; then
+    log "  [PASS] Outbound TCP 443 to drive.googleapis.com succeeded."
+else
+    warn "  [WARN] Outbound TCP 443 to drive.googleapis.com failed/timed out. Check host egress firewall."
+fi
+
+# Check 5: Local Agent /health HTTP endpoint check over TLS
+if python3 -c '
+import urllib.request, ssl, sys
+ctx = ssl.create_default_context(cafile="'"${TLS_DIR}/ca.crt"'")
+ctx.load_cert_chain(certfile="'"${TLS_DIR}/dashboard.crt"'", keyfile="'"${TLS_DIR}/dashboard.key"'")
+req = urllib.request.Request("https://'${AGENT_IP}':'${PORT}'/health")
+try:
+    with urllib.request.urlopen(req, context=ctx, timeout=5) as res:
+        sys.exit(0 if res.status == 200 else 1)
+except Exception as e:
+    sys.exit(1)
+' >/dev/null 2>&1; then
+    log "  [PASS] Agent health endpoint (https://${AGENT_IP}:${PORT}/health) answered 200 OK."
+else
+    warn "  [WARN] Local health check query to https://${AGENT_IP}:${PORT}/health did not return 200 OK."
+fi
+
+if [[ $HEALTH_PASSED -eq 0 ]]; then
+    die "Post-install verification failed. Review warnings/errors above."
+fi
+
+# ---- Summary Output (Secrets redacted) -------------------------------------
 cat <<EOF
 
-$(log "Agent is running on https://${HOST_IP}:${PORT}")
+$(log "Agent successfully installed and running on https://${AGENT_IP}:${PORT}")
 
 Configure the ProxSync dashboard with:
 
-  Agent URL          https://${HOST_IP}:${PORT}
+  Agent URL          https://${AGENT_IP}:${PORT}
   API key id         proxsync-dashboard
-  HMAC secret        ${HMAC_SECRET}
+  HMAC secret        [SECURELY STORED IN ${ENV_FILE}]
 
-Copy these three files to the dashboard LXC (they authenticate it to this agent):
+To view the HMAC secret for dashboard configuration, run:
+  grep PROXSYNC_AGENT_HMAC_SECRET ${ENV_FILE}
+
+Copy these three client authentication files to your ProxSync dashboard LXC:
 
   ${TLS_DIR}/ca.crt          -> /etc/proxsync/agent-ca.crt
   ${TLS_DIR}/dashboard.crt   -> /etc/proxsync/agent-client.crt
   ${TLS_DIR}/dashboard.key   -> /etc/proxsync/agent-client.key   (mode 0640)
 
-For example, from the dashboard container:
+Example transfer command from the dashboard LXC:
 
-  scp root@${HOST_IP}:${TLS_DIR}/{ca.crt,dashboard.crt,dashboard.key} /etc/proxsync/
+  scp root@${AGENT_IP}:${TLS_DIR}/{ca.crt,dashboard.crt,dashboard.key} /etc/proxsync/
 
-Verify:  curl --cacert ${TLS_DIR}/ca.crt https://${HOST_IP}:${PORT}/health
-Logs:    journalctl -u ${SERVICE} -f
+Verification:  curl --cacert ${TLS_DIR}/ca.crt https://${AGENT_IP}:${PORT}/health
+Logs:          journalctl -u ${SERVICE} -f
 
 EOF

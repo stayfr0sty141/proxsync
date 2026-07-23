@@ -81,14 +81,22 @@ class ProcessHandle:
         return True
 
 
-def _signal_group(pid: int, sig: signal.Signals) -> None:
+def _signal_group(pid: int | None, sig: signal.Signals) -> None:
     """Signal the child's whole process group — vzdump spawns helpers that must die with it."""
+    if pid is None:
+        return
     try:
-        os.killpg(os.getpgid(pid), sig)
+        pgid = os.getpgid(pid)
+        agent_pgid = os.getpgid(0)
+        # Never signal our own process group via killpg
+        if pgid == agent_pgid:
+            os.kill(pid, sig)
+        else:
+            os.killpg(pgid, sig)
     except ProcessLookupError:
         pass
-    except PermissionError:  # pragma: no cover - only when the child changed uid
-        with contextlib.suppress(ProcessLookupError):
+    except (PermissionError, OSError):  # pragma: no cover - defensive fallback
+        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
             os.kill(pid, sig)
 
 
@@ -202,13 +210,20 @@ class ProcessRunner:
             stderr=asyncio.subprocess.STDOUT,
             stdin=asyncio.subprocess.DEVNULL,
             env=_CHILD_ENV,
+            start_new_session=True,
         )
         try:
             async with asyncio.timeout(timeout_seconds):
                 stdout, _ = await process.communicate()
         except TimeoutError:
             _signal_group(process.pid, signal.SIGKILL)
-            await process.wait()
+            with contextlib.suppress(Exception):
+                await process.wait()
             raise ExecutionFailed(f"'{command[0]}' timed out after {timeout_seconds}s") from None
+        except Exception:
+            _signal_group(process.pid, signal.SIGKILL)
+            with contextlib.suppress(Exception):
+                await process.wait()
+            raise
 
         return process.returncode or 0, stdout.decode("utf-8", errors="replace")

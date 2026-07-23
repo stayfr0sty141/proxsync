@@ -7,7 +7,7 @@
 
 [Unit]
 Description=Daily ProxSync database self-backup
-Documentation=https://github.com/ProxSync/ProxSync
+Documentation=https://github.com/stayfr0sty141/proxsync
 
 [Timer]
 OnCalendar=*-*-* 02:15:00

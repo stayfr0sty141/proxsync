@@ -27,6 +27,8 @@ import type { SectionResponse } from "@/types/api";
  * left untouched is never re-submitted so its stored value is preserved.
  */
 
+import { AgentSetupWizard } from "@/components/settings/agent-setup-wizard";
+
 const SECTIONS: { key: string; label: string }[] = [
   { key: "general", label: "General" },
   { key: "gdrive", label: "Google Drive" },
@@ -64,18 +66,21 @@ export default function SettingsPage() {
             ))}
           </nav>
 
-          <DataState
-            isLoading={query.isLoading}
-            isError={query.isError}
-            error={query.error}
-            data={query.data}
-            onRetry={() => {
-              query.refetch();
-            }}
-            loadingRows={5}
-          >
-            {(data) => <SectionForm key={section} section={section} data={data} />}
-          </DataState>
+          <div>
+            {section === "agent" && <AgentSetupWizard />}
+            <DataState
+              isLoading={query.isLoading}
+              isError={query.isError}
+              error={query.error}
+              data={query.data}
+              onRetry={() => {
+                query.refetch();
+              }}
+              loadingRows={5}
+            >
+              {(data) => <SectionForm key={section} section={section} data={data} />}
+            </DataState>
+          </div>
         </div>
       </div>
     </AuthGuard>

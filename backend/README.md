@@ -6,7 +6,7 @@ delegated to the [Backup Agent](../agent/README.md) over mutual TLS.
 
 ## Layering
 
-```
+```text
 api/v1/routes  →  services  →  repositories  →  db/models
                      ↓
                   clients (agent, proxmox, telegram)
@@ -19,7 +19,7 @@ mechanical. FastAPI `Depends` wires the edge; constructor injection does the res
 ## Security model
 
 | Concern | Decision |
-|---|---|
+| --- | --- |
 | Passwords | Argon2id (`t=3, m=64 MiB, p=4`), transparently re-hashed on login when parameters are raised |
 | Access tokens | JWT, 15 min, browser memory only — never written to a cookie, so a CSRF cannot replay one |
 | Refresh tokens | Opaque random strings stored as SHA-256 digests. Rotated on every use; presenting an already-rotated token revokes the whole **family**, turning theft into a detectable, self-limiting event |
@@ -60,7 +60,7 @@ alembic revision --autogenerate -m "..."   # after changing a model; review the 
 ## Endpoints (M2–M7)
 
 | Method | Path | Role |
-|---|---|---|
+| --- | --- | --- |
 | POST | `/api/v1/auth/login` | — |
 | POST | `/api/v1/auth/refresh` · `/logout` | cookie + CSRF |
 | GET | `/api/v1/auth/me` | any |
@@ -109,7 +109,7 @@ the same code path as normal operation, and the scheduler and the API can both s
 without knowing about each other.
 
 | Concern | Decision |
-|---|---|
+| --- | --- |
 | Concurrency | One run, one guest at a time. The agent holds a single backup slot, so overlapping would only earn a 409 from it |
 | Restart mid-run | The run is re-queued and resumes: guests already finished are skipped, and a backup still running on the agent is re-adopted rather than restarted |
 | Unknown outcome | Recorded as `interrupted`, never retried. `vzdump` is not idempotent, and a lost *response* is indistinguishable from a lost *request* |
@@ -176,7 +176,7 @@ The upload queue is `sync_tasks`, and it is a queue rather than a log: `attempt`
 schedule instead of starting it over.
 
 | Concern | Decision |
-|---|---|
+| --- | --- |
 | Who queues | The sync worker scans for successful backups marked `pending` each cycle. The run executor does not call it, so a backup that finished while the worker was stopped is still uploaded, and neither worker knows about the other |
 | Retry | Exponential backoff with **full jitter**. The common failure is a Drive quota shared by every pending transfer; retrying in lockstep reproduces the burst that caused it |
 | Is a retry safe? | Yes, unlike a backup. `rclone copyto` overwrites the same object; it cannot produce a second artifact the way a second `vzdump` would. That is what makes an automatic retry policy defensible here at all |
@@ -222,7 +222,7 @@ A restore is the only operation ProxSync performs that destroys data, and everyt
 flow follows from that.
 
 | Concern | Decision |
-|---|---|
+| --- | --- |
 | Authorisation | Two phases. `POST /restores` records a `pending_confirmation` row and a five-minute token; the restore starts only when a second request echoes that token **and** the literal target VMID. The token is stored as a SHA-256 and cleared on use, so it cannot be replayed |
 | Staleness | Confirmation re-runs every preflight check against the live host. The archive may have been deleted or the target started while the dialog was open; a new blocker returns 409 with the fresh report and the restore stays pending |
 | Unevaluable checks | Fail. An unreachable agent or an unlisted storage blocks the restore — a report where "could not check" read as "checked, fine" would be worse than no report |
@@ -247,7 +247,7 @@ instead of being rendered as zero.
 Telling the operator is never on the critical path of the work being reported.
 
 | Concern | Decision |
-|---|---|
+| --- | --- |
 | Durability | The outbox row is written **in the same transaction as the state change it describes**. A message cannot describe something that was rolled back, and a state change cannot happen unannounced |
 | Delivery | At-least-once. The attempt is charged *before* the send, so a process that dies mid-request leaves a scheduled retry rather than a row claiming an attempt that never happened. Sending twice destroys nothing — the opposite of the trade `vzdump` and `qmrestore` force |
 | Retry policy | A transport error, a 429 or a 5xx is requeued with exponential backoff and full jitter, honouring Telegram's own `retry_after`. `400 chat not found`, `401 Unauthorized` and missing configuration are terminal on the first attempt: retrying them only delays a failure the operator has to see |
@@ -271,7 +271,7 @@ writer or recurse through SQLAlchemy's own logging.
 So the structlog processor appends to a bounded deque and returns; `LogWriter` drains it.
 
 | Situation | Behaviour |
-|---|---|
+| --- | --- |
 | Buffer full | The **oldest** entry is dropped and counted. `/logs` and `/health/detail` report the count, so an incomplete page says so rather than reading as a quiet night |
 | Database unavailable | The batch goes back to the front of the queue. A hiccup costs latency, not log lines |
 | Foreign key no longer resolves | The batch is rewritten with the links cleared and the ids left in `context`. The line is the point, not the join, and one rolled-back reference must not wedge every batch behind it |

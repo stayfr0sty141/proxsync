@@ -6,7 +6,7 @@
 
 [Unit]
 Description=ProxSync database self-backup
-Documentation=https://github.com/ProxSync/ProxSync
+Documentation=https://github.com/stayfr0sty141/proxsync
 After=proxsync-api.service
 
 [Service]

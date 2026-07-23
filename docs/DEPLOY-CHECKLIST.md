@@ -12,7 +12,7 @@ A print-and-tick checklist for a first real deployment. It condenses
 
 ## Topology recap
 
-```
+```text
 ┌─ Proxmox host (root) ───────────┐
 │  proxsync-agent   (deploy/host/)  │  ← runs the vzdump/qmrestore/rclone commands
 └──────────────▲──────────────┘
@@ -30,6 +30,7 @@ Two machines: the **agent** on the Proxmox host, the **dashboard** in an LXC.
 ## Phase 0 — Prerequisites
 
 ### 0.1 The LXC container
+
 - [ ] Create an **unprivileged** LXC on Proxmox
       *(Datacenter → Create CT → uncheck "Privileged")*
 - [ ] Use a **Debian 13 (Trixie)** template — it ships **Python 3.13**, which the backend
@@ -40,11 +41,13 @@ Two machines: the **agent** on the Proxmox host, the **dashboard** in an LXC.
 - **Verify:** `pct exec <ctid> -- python3 --version` → `Python 3.13.x`
 
 ### 0.2 Note your addresses
+
 - [ ] `<LXC_IP>` — the dashboard container (e.g. `10.0.0.20`)
 - [ ] `<HOST_IP>` — the Proxmox host (e.g. `10.0.0.10`)
 - [ ] `<SERVER_NAME>` — hostname you'll open in the browser (e.g. `proxsync.lan`)
 
 ### 0.3 Get the code onto both machines
+
 - [ ] Clone/copy the repo into the **LXC** (e.g. `/root/ProxSync`)
 - [ ] Clone/copy the repo onto the **Proxmox host** (e.g. `/root/ProxSync`)
 - **Verify:** `ls ProxSync/deploy/lxc/install.sh` exists on the LXC, and
@@ -57,15 +60,18 @@ Two machines: the **agent** on the Proxmox host, the **dashboard** in an LXC.
 > Do the agent **first** — it prints the credentials the dashboard needs.
 
 ### 1.1 Preconditions
+
 - [ ] Backup storage exists and is mounted (e.g. `backup-hdd`)
 - [ ] Dump directory exists (e.g. `/mnt/backup-hdd/dump`)
 - **Verify:** `pvesm status | grep backup-hdd` shows the storage
 
 ### 1.2 Run the installer
+
 ```bash
 cd ProxSync/deploy/host
 ./install-agent.sh --dashboard-ip <LXC_IP> --dump-root /mnt/backup-hdd/dump
 ```
+
 - [ ] Installer finished without error
 - [ ] **Copied down its output:** the **HMAC secret** and the paths to `ca.crt`,
       `dashboard.crt`, `dashboard.key`
@@ -74,11 +80,13 @@ cd ProxSync/deploy/host
       returns a health JSON
 
 ### 1.3 Create the read-only Proxmox token
+
 ```bash
 pveum user add proxsync@pve
 pveum acl modify / --user proxsync@pve --role PVEAuditor
 pveum user token add proxsync@pve dashboard --privsep 0
 ```
+
 - [ ] **Saved** the printed token id (`proxsync@pve!dashboard`) and secret
 - **Verify:** `pveum user token list proxsync@pve` shows the `dashboard` token
 
@@ -87,17 +95,21 @@ pveum user token add proxsync@pve dashboard --privsep 0
 ## Phase 2 — Install the Dashboard (in the LXC)
 
 ### 2.1 Install OS prerequisites
+
 ```bash
 apt update
 apt install -y python3 python3-venv nodejs npm nginx sqlite3 openssl
 ```
+
 - **Verify:** `node -v` ≥ v20, `nginx -v` works, `python3 --version` = 3.13.x
 
 ### 2.2 Run the installer
+
 ```bash
 cd ProxSync/deploy/lxc
 ./install.sh --server-name <SERVER_NAME> --agent-ip <HOST_IP>
 ```
+
 - [ ] Installer finished without error (it builds the frontend — takes a minute)
 - [ ] **Saved** the printed first-run **admin password**
 - **Verify:** `systemctl is-active proxsync-api proxsync-web` → both `active`
@@ -108,6 +120,7 @@ cd ProxSync/deploy/lxc
 ## Phase 3 — Introduce the two components
 
 ### 3.1 Copy the agent's client certificates into the LXC
+
 ```bash
 # From the LXC:
 scp root@<HOST_IP>:/etc/proxsync-agent/tls/{ca.crt,dashboard.crt,dashboard.key} /etc/proxsync/
@@ -117,15 +130,19 @@ mv /etc/proxsync/dashboard.key /etc/proxsync/agent-client.key
 chown root:proxsync /etc/proxsync/agent-*.crt /etc/proxsync/agent-client.key
 chmod 0640 /etc/proxsync/agent-client.key
 ```
+
 - **Verify:** the three `agent-*` files exist in `/etc/proxsync/`
 
 ### 3.2 Fill in the secrets
+
 Edit `/etc/proxsync/api.env` and set:
+
 ```ini
 PROXSYNC_AGENT_HMAC_SECRET=<HMAC secret the agent printed>
 PROXSYNC_PROXMOX_TOKEN_ID=proxsync@pve!dashboard
 PROXSYNC_PROXMOX_TOKEN_SECRET=<token secret>
 ```
+
 - [ ] Set the three values above
 - [ ] Restart: `systemctl restart proxsync-api`
 
@@ -134,14 +151,17 @@ PROXSYNC_PROXMOX_TOKEN_SECRET=<token secret>
 ## Phase 4 — Verify end to end
 
 ### 4.1 Health probe
+
 ```bash
 curl -sk https://<SERVER_NAME>/api/v1/health/detail | python3 -m json.tool
 ```
+
 - [ ] `agent` reports **`ok`** (mTLS + HMAC working)
 - [ ] `database` reports **`ok`**
 - [ ] `proxmox` reports **`ok`** (PVEAuditor token working)
 
 ### 4.2 Log in
+
 - [ ] Open `https://<SERVER_NAME>/` (accept the self-signed cert warning for now)
 - [ ] Log in with `admin` + the printed password
 - [ ] Change the password when prompted
@@ -149,6 +169,7 @@ curl -sk https://<SERVER_NAME>/api/v1/health/detail | python3 -m json.tool
       `sed -i 's/^PROXSYNC_BOOTSTRAP_ADMIN_PASSWORD=.*/PROXSYNC_BOOTSTRAP_ADMIN_PASSWORD=/' /etc/proxsync/api.env`
 
 ### 4.3 Inventory
+
 - [ ] Guests from the host appear in the dashboard (read via the PVEAuditor token)
 - [ ] New guests are **off for backup by default** (expected — you enable them explicitly)
 
@@ -194,6 +215,7 @@ journalctl -u proxsync-agent -f                    # on the host
 ```
 
 Most first-install failures are one of:
+
 - **`agent` not `ok`** → firewall/`IPAddressAllow`, client cert path/perms, HMAC mismatch, or
   clock skew between host and LXC (see TROUBLESHOOTING.md).
 - **API won't start** → a missing/invalid value in `/etc/proxsync/api.env`

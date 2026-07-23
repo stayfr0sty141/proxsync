@@ -1,6 +1,6 @@
 [Unit]
 Description=ProxSync Backup Agent
-Documentation=https://github.com/proxsync/proxsync/blob/main/docs/ARCHITECTURE.md
+Documentation=https://github.com/stayfr0sty141/proxsync/blob/main/docs/ARCHITECTURE.md
 After=network-online.target pve-cluster.service
 Wants=network-online.target
 ConditionPathExists=/usr/bin/vzdump
@@ -46,11 +46,15 @@ MemoryDenyWriteExecute=no
 # NOT denied: helper processes spawned by vzdump may JIT.
 
 # --- Network reachability --------------------------------------------------
-# Replace 10.0.0.20 with the dashboard LXC address. Defence in depth: the application also
-# enforces PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS.
-IPAddressDeny=any
-IPAddressAllow=localhost
-IPAddressAllow=10.0.0.20/32
+# Note on systemd IP filtering: IPAddressDeny=any blocks ALL inbound & outbound connections.
+# Because the agent invokes rclone for Google Drive syncs (which connect to dynamic outbound
+# Google endpoints), systemd IP filtering is not used here.
+# Defence in depth is enforced via:
+# 1) Bind IP (PROXSYNC_AGENT_BIND_HOST)
+# 2) Host nftables / iptables rules
+# 3) Mutual TLS (mTLS) with dedicated CA
+# 4) HMAC request signature verification
+# 5) App layer PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS filtering
 
 # --- Managed directories ---------------------------------------------------
 StateDirectory=proxsync-agent
@@ -61,7 +65,10 @@ ConfigurationDirectory=proxsync-agent
 ConfigurationDirectoryMode=0750
 
 # --- Resources and lifecycle ----------------------------------------------
-MemoryMax=512M
+# The agent process and its spawned children (vzdump, qmrestore, pct, rclone, sha256sum)
+# share this systemd cgroup. Memory limits are set to allow heavy backup/sync operations.
+MemoryHigh=1G
+MemoryMax=2G
 TasksMax=256
 Restart=on-failure
 RestartSec=5s

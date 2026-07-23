@@ -7,7 +7,7 @@ generic command endpoint.
 ## Security model
 
 | Layer | Control |
-|---|---|
+| --- | --- |
 | Address | `PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS` — checked before authentication, on every route including `/health`. Mirrored by `IPAddressAllow=` in the systemd unit |
 | Transport | Mutual TLS. uvicorn runs with `ssl_cert_reqs=CERT_REQUIRED` against the dashboard CA, so a handshake without a valid client certificate never reaches the application |
 | Request | HMAC-SHA256 over `METHOD\|path?query\|timestamp\|nonce\|sha256(body)`. ±60 s window, single-use nonces, constant-time comparison |
@@ -23,7 +23,7 @@ unlisted address.
 ## Endpoints
 
 | Method | Path | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | POST | `/backup/start` | Run `vzdump` for one guest → task id |
 | GET | `/backup/list` | List artifacts (`?vmid=`, `?guest_type=`) |
 | DELETE | `/backup/{id}` | Delete an artifact and its `.log` / `.notes` / `.sha256` sidecars |
@@ -53,9 +53,9 @@ exist.
 ## Install
 
 ```bash
-git clone https://github.com/proxsync/proxsync.git
-cd proxsync
-./deploy/host/install-agent.sh --dashboard-ip 10.0.0.20
+cd /tmp && git clone https://github.com/stayfr0sty141/proxsync.git
+cd proxsync/deploy/host
+./install-agent.sh --agent-ip 10.0.0.10 --dashboard-ip 10.0.0.20
 ```
 
 The script builds the PKI, writes `/etc/proxsync-agent/agent.env`, creates a virtualenv in
@@ -99,7 +99,7 @@ rclone runs **here**, not in the dashboard container: the artifacts are on this 
 copying 40 GiB through the LXC to reach Drive would double the network cost for nothing.
 
 | Endpoint | Command |
-|---|---|
+| --- | --- |
 | `POST /sync/upload` · `/sync/download` | `rclone copyto` — never `copy`, which treats the destination as a directory |
 | `POST /sync/delete` | `rclone deletefile` — never `delete`, which removes a directory's contents |
 | `GET /sync/list` | `rclone lsjson --hash` |

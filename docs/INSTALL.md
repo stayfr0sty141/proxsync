@@ -3,7 +3,7 @@
 ProxSync is two components that are installed separately and then introduced to each other:
 
 | Component | Where it runs | Installer |
-|---|---|---|
+| --- | --- | --- |
 | **Backup Agent** | The Proxmox VE host, as root | `deploy/host/install-agent.sh` |
 | **Dashboard** (API + Web UI) | An unprivileged LXC container | `deploy/lxc/install.sh` |
 
@@ -16,14 +16,14 @@ Install the **agent first** — it prints the credentials the dashboard needs.
 
 ## 0. Prerequisites
 
-**On the Proxmox host**
+### On the Proxmox host
 
 - Proxmox VE 8 (Debian 12) or 9 (Debian 13)
 - A mounted backup storage (e.g. `backup-hdd`) and its dump directory
 - `openssl`, `python3` ≥ 3.11 (both ship with PVE)
 - `rclone` configured with your Google Drive remote, if you want off-site sync (see §5)
 
-**In the LXC container** (Debian 12/13, unprivileged)
+### In the LXC container (Debian 12/13, unprivileged)
 
 - Python **3.13** (the dashboard requires it)
 - Node.js **20+** and npm (to build the frontend)
@@ -160,7 +160,7 @@ rclone config
 ```
 
 | Prompt | Answer |
-|---|---|
+| --- | --- |
 | `n/s/q>` | `n` (new remote) |
 | `name>` | **`gdrive`** (the default remote name ProxSync expects) |
 | `Storage>` | Pick the number for **Google Drive** |
@@ -208,7 +208,7 @@ systemctl restart proxsync-agent
 Open the ProxSync web UI, go to **Settings → Google Drive**, and set:
 
 | Setting | Value |
-|---|---|
+| --- | --- |
 | `enabled` | `true` |
 | `remote_name` | `gdrive` |
 | `folder` | `proxsync/dump` (or your preferred path) |
@@ -236,7 +236,7 @@ certbot certonly --webroot -w /var/www/certbot -d proxsync.lan
 ## What the installer configured
 
 | Path | Contents |
-|---|---|
+| --- | --- |
 | `/opt/proxsync/backend` | API code + virtualenv |
 | `/opt/proxsync/frontend` | Next.js standalone build |
 | `/opt/proxsync/scripts` | Maintenance scripts (DB backup/restore, upgrade) |

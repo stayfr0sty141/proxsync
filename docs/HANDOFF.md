@@ -8,7 +8,7 @@ including a future session with no memory of building it.
 ## 1. Where things stand
 
 | Milestone | State | Tests |
-|---|---|---|
+| --- | --- | --- |
 | M0 foundations — architecture, schema, API, UI, roadmap | ✅ | — |
 | M1 Backup Agent (host) | ✅ code-complete, **not host-validated** | 292 |
 | M2 Dashboard core — persistence, auth, settings | ✅ code-complete, **not wire-validated** | (in 659) |
@@ -85,7 +85,7 @@ Until (1) and (2) are done, everything downstream rests on an unverified assumpt
 
 Two processes, one privileged surface:
 
-```
+```text
 ┌─────────────────────────── Proxmox host (root) ───────────────────────────┐
 │  proxsync-agent  ── vzdump · qmrestore · pct restore · pvesm · rclone      │
 │  FastAPI, mTLS + HMAC, address allow-list, closed command vocabulary       │
@@ -103,7 +103,7 @@ The dashboard executes no shell command, ever. CI greps for `shell=True`, `os.sy
 ### Rules that hold everywhere
 
 | Rule | Why |
-|---|---|
+| --- | --- |
 | **The database is the queue** — for backup runs, transfers, restores and notifications | A crash loses nothing; restart recovery is the same code path as normal operation; the API and the scheduler submit work without knowing about each other |
 | In-memory doorbells only remove latency | Rung from a SQLAlchemy `after_commit` hook, so a worker can never see a row before it is committed. Backup, sync, restore and outbox idle polls are the backstop |
 | Retention is event-driven and fail-closed | It reconciles at startup, then uses post-commit doorbells and bounded failure retries. It has no healthy-state poll that would duplicate decision events |
@@ -119,7 +119,7 @@ The dashboard executes no shell command, ever. CI greps for `shell=True`, `os.sy
 ### `agent/` — runs on the Proxmox host
 
 | Path | What it is |
-|---|---|
+| --- | --- |
 | `app/core/security.py` | HMAC verification, nonce cache, clock skew, address allow-list |
 | `app/executors/base.py` | The **only** place a child process is created. `create_subprocess_exec`, argv lists, absolute binaries, process-group cancellation |
 | `app/executors/{vzdump,restore,pvesm,checksum,rclone}.py` | argv construction and output parsing, one module per tool |
@@ -131,7 +131,7 @@ The dashboard executes no shell command, ever. CI greps for `shell=True`, `os.sy
 ### `backend/` — runs in the LXC
 
 | Path | What it is |
-|---|---|
+| --- | --- |
 | `app/api/deps.py` | Composition root. **Read the module docstring** — it documents the transaction boundary |
 | `app/clients/agent_client.py` | The only component that may reach the agent. Signs byte-identically to its verifier |
 | `app/clients/proxmox_client.py` | Read-only inventory. Exposes exactly one verb, `_get` — there is no code path that can write to the host |
@@ -221,7 +221,7 @@ surfaced as data loss or silent wrong behaviour.
 ## 6. Decisions that are settled (do not re-litigate without reading why)
 
 | Decision | Where the reasoning lives |
-|---|---|
+| --- | --- |
 | rclone runs on the host, not in the LXC (D1) | `agent/app/executors/rclone.py` docstring |
 | Inventory via a read-only PVEAuditor token (D2) | `backend/app/clients/proxmox_client.py` docstring |
 | Agent runs as root under a hardened unit, not sudoers (D3) | `docs/ARCHITECTURE.md` §3.1 |

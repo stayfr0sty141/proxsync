@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const rawApiOrigin = process.env.PROXSYNC_API_ORIGIN;
-const API_ORIGIN =
-  typeof rawApiOrigin === "string" ? rawApiOrigin : "http://127.0.0.1:8000";
+const API_ORIGIN = typeof rawApiOrigin === "string" ? rawApiOrigin : "http://127.0.0.1:8000";
 
 const nextConfig = {
   reactStrictMode: true,

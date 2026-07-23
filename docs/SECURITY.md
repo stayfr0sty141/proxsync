@@ -14,7 +14,7 @@ host would mean one web vulnerability equals host root.
 
 ProxSync separates the two:
 
-```
+```text
   Browser ──TLS──▶ Dashboard (unprivileged LXC) ──mTLS + HMAC──▶ Agent (host, root)
 ```
 
@@ -27,7 +27,7 @@ arbitrary command, only to perform one of a small set of validated operations.
 ## 2. Trust boundaries
 
 | Boundary | Control |
-|---|---|
+| --- | --- |
 | Browser → Dashboard | TLS (nginx). Session is a short-lived JWT access token + a rotating refresh token; CSRF double-submit on state-changing requests. |
 | Dashboard → Agent | Mutual TLS **and** an HMAC signature over each request, with a TTL nonce cache and clock-skew rejection. Both are required; neither alone suffices. |
 | Agent → Proxmox tools | A closed set of argv-only executors. No shell, ever. |
@@ -79,7 +79,7 @@ remote and turn an “upload” into an arbitrary file read. Name the remotes yo
 ## 5. Secrets
 
 | Secret | Where it lives | Protection |
-|---|---|---|
+| --- | --- | --- |
 | Root secret (`PROXSYNC_SECRET_KEY`) | Environment only, never the database | Derives the JWT key and the settings-encryption key via HKDF |
 | Settings secrets (e.g. Telegram bot token) | `settings` table | Fernet-encrypted with a key derived from the root secret; write-only in the API, returned only as a masked hint |
 | Agent HMAC secret | Environment on both sides | Never logged; used only to sign/verify |

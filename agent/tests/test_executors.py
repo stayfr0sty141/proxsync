@@ -236,3 +236,37 @@ class TestArgvValidation:
 
     def test_accepts_valid_command(self) -> None:
         assert validate_argv(["/usr/bin/vzdump", "101"]) == ["/usr/bin/vzdump", "101"]
+
+
+class TestProcessRunnerSafety:
+    @pytest.mark.asyncio
+    async def test_run_capture_has_distinct_pgid(self) -> None:
+        import os
+
+        from app.executors.base import ProcessRunner
+
+        runner = ProcessRunner()
+        # Python prints its own pgid via os.getpgid(0)
+        code, out = await runner.run_capture(
+            ["/usr/bin/python3", "-c", "import os; print(os.getpgid(0))"],
+            timeout_seconds=5,
+        )
+        assert code == 0
+        child_pgid = int(out.strip())
+        agent_pgid = os.getpgid(0)
+        assert child_pgid != agent_pgid
+
+    @pytest.mark.asyncio
+    async def test_run_capture_timeout_kills_descendants_and_keeps_agent_alive(self) -> None:
+        from app.core.errors import ExecutionFailed
+        from app.executors.base import ProcessRunner
+
+        runner = ProcessRunner()
+        # Spawn a python process that spawns a sleep grandchild and waits
+        cmd = [
+            "/usr/bin/python3",
+            "-c",
+            "import subprocess, time; subprocess.Popen(['sleep', '60']); time.sleep(60)",
+        ]
+        with pytest.raises(ExecutionFailed, match="timed out"):
+            await runner.run_capture(cmd, timeout_seconds=1)

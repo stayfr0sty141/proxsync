@@ -6,7 +6,7 @@
 
 [Unit]
 Description=ProxSync dashboard (API + Web UI)
-Documentation=https://github.com/ProxSync/ProxSync
+Documentation=https://github.com/stayfr0sty141/proxsync
 Wants=proxsync-api.service proxsync-web.service
 After=proxsync-api.service proxsync-web.service
 

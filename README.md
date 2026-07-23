@@ -1,21 +1,14 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/python-3.13%20%7C%203.11+-yellow?style=for-the-badge&logo=python" alt="Python">
-  <img src="https://img.shields.io/badge/status-M0--M9%20complete-success?style=for-the-badge" alt="Status">
-</p>
+# ProxSync
 
-<h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/proxsync/proxsync/main/docs/assets/logo-dark.svg">
-    <img alt="ProxSync" src="https://raw.githubusercontent.com/proxsync/proxsync/main/docs/assets/logo-light.svg" height="64">
-  </picture>
-</h1>
+![Version](https://img.shields.io/badge/version-0.1.0-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
+![Python](https://img.shields.io/badge/python-3.13%20%7C%203.11+-yellow?style=for-the-badge&logo=python)
+![Status](https://img.shields.io/badge/status-M0--M9%20complete-success?style=for-the-badge)
 
-<p align="center">
-  <strong>The batteries-included backup dashboard your Proxmox homelab deserves.</strong><br>
-  Schedule, replicate, retain, restore — all from a clean web UI, without compromising your hypervisor.
-</p>
+![ProxSync Logo](https://raw.githubusercontent.com/stayfr0sty141/proxsync/main/docs/assets/logo-dark.svg)
+
+**The batteries-included backup dashboard your Proxmox homelab deserves.**
+Schedule, replicate, retain, restore — all from a clean web UI, without compromising your hypervisor.
 
 ---
 
@@ -44,7 +37,7 @@ Running a web dashboard there? That's an unacceptable attack surface.
 
 ProxSync splits into **two hardened halves** that talk over mutual TLS:
 
-```
+```text
 ┌─────────────────────────────────┐      mTLS       ┌──────────────────────────────┐
 │        Dashboard (LXC)          │ ◄──────────────► │     Backup Agent (PVE Host)  │
 │  ┌───────────┐  ┌────────────┐  │                  │  ┌──────────────────────────┐ │
@@ -56,7 +49,7 @@ ProxSync splits into **two hardened halves** that talk over mutual TLS:
 ```
 
 | Component | Runs on | Privilege | Role |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Dashboard** `backend/` + `frontend/` | Unprivileged LXC | Ordinary user | UI, auth, scheduling, retention policies, history |
 | **Backup Agent** `agent/` | Proxmox host | `root`, hardened | Execute a **fixed, closed set** of backup/restore/storage ops |
 
@@ -72,7 +65,7 @@ credentials the dashboard needs:
 
 ```bash
 # 1️⃣ On the Proxmox host:
-cd ProxSync/deploy/host && ./install-agent.sh --dashboard-ip 10.0.0.20
+cd ProxSync/deploy/host && ./install-agent.sh --agent-ip 10.0.0.10 --dashboard-ip 10.0.0.20
 
 # 2️⃣ In the unprivileged LXC:
 cd ProxSync/deploy/lxc && ./install.sh --server-name proxsync.lan --agent-ip 10.0.0.10
@@ -85,7 +78,7 @@ Full walkthrough — including mTLS credential exchange, PVEAuditor token setup,
 
 ## 📦 What's Inside
 
-```
+```text
 ProxSync/
 ├── agent/            FastAPI backup agent — runs on PVE host as root
 ├── backend/          Dashboard API — FastAPI + SQLAlchemy + APScheduler
@@ -101,7 +94,7 @@ ProxSync/
 ## 📚 Documentation
 
 | Doc | What you'll find |
-|---|---|
+| --- | --- |
 | **[📖 HANDOFF](docs/HANDOFF.md)** | 👈 **Start here.** Current state, verified vs pending, settled decisions |
 | **[🏗️ Architecture](docs/ARCHITECTURE.md)** | Trust boundaries, data flow, threat model, component topology |
 | **[🗄️ Database](docs/DATABASE.md)** | Schema, ERD, indexes, portability (SQLite ↔ PostgreSQL) |
@@ -131,7 +124,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full developer workflow.
 ## 🧰 Tech Stack
 
 | Layer | Choices |
-|---|---|
+| --- | --- |
 | **Backend** | Python 3.13 · FastAPI · SQLAlchemy 2.0 · Alembic · APScheduler · Pydantic v2 · httpx · structlog |
 | **Agent** | Python ≥3.11 (PVE 8 compat) · FastAPI · stdlib `subprocess` (list-args only) |
 | **Database** | SQLite by default, PostgreSQL-ready — zero dialect-specific SQL |
@@ -148,6 +141,4 @@ Contributions welcome under the same terms — read **[CONTRIBUTING.md](CONTRIBU
 
 ---
 
-<p align="center">
-  <sub>Built with ❤️ for the homelab community. v0.1.0 — M0–M9 complete.</sub>
-</p>
+*Built with ❤️ for the homelab community. v0.1.0 — M0–M9 complete.*

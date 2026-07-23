@@ -2,7 +2,7 @@
 
 ## 1. Topology
 
-```
+```text
 ┌──────────────────────────── Proxmox VE Host (root) ────────────────────────────┐
 │                                                                                │
 │   /mnt/backup-hdd/dump          ← PVE backup storage (vzdump target)           │
@@ -57,7 +57,7 @@
 Single-purpose FastAPI service. No database, no ORM, no UI, ~15 files.
 
 | Layer | Responsibility |
-|---|---|
+| --- | --- |
 | `api/routes/` | Thin HTTP handlers; Pydantic request models only |
 | `validators/` | VMID allow-list, storage allow-list, mode/compression enums, path canonicalisation |
 | `executors/` | `argv` construction and `asyncio.create_subprocess_exec` invocation |
@@ -87,7 +87,7 @@ boundary. This is documented in `docs/SECURITY.md` (M1) with the residual risk s
 
 Clean-architecture layering, dependencies point inward:
 
-```
+```text
 api/v1/routes  →  services  →  repositories  →  db/models
                      ↓
                   clients (agent, proxmox, telegram)
@@ -118,7 +118,7 @@ invalidating query keys on task progress so the UI updates without polling loops
 
 ## 4. Control flow: a scheduled backup
 
-```
+```text
 APScheduler fires (0 1 * * 0, Asia/Jakarta)
   └─ BackupService.run_job(job_id)
        ├─ resolve targets  (job targets ∩ live PVE inventory ∩ allow-list)
@@ -168,7 +168,7 @@ sets it to `deleted`. Every applying decision is written to `retention_events`, 
 
 ## 5. Control flow: storage monitoring
 
-```
+```text
 Application worker startup
   └─ StorageSampler.sample_once() immediately, then every 15 minutes by default
        ├─ read local filesystem + pvesm status from the agent
@@ -194,7 +194,7 @@ newest eligible name.
 
 ## 6. Control flow: a restore (two-phase, never immediate)
 
-```
+```text
 POST /api/v1/restores/preflight  → runs every check, writes nothing, returns the report
 POST /api/v1/restores            → creates restore_history row, status=pending_confirmation
                                     returns preflight report + confirmation_token (TTL 5 min)
@@ -244,7 +244,7 @@ shortly afterwards. Retention and a manual `DELETE /backups/{id}` refuse the sam
 Two things happen alongside every state change above, and both are deliberately *out of the
 path* of the work they describe.
 
-```
+```text
 Any worker, inside the transaction that records the state change
   └─ NotificationGateway.emit(event, variables, dedupe_key, unique)
        ├─ channel off, or this event's toggle off → nothing written
@@ -264,7 +264,7 @@ Delivery is at-least-once, which is the opposite of the choice `vzdump` and `qmr
 sending a message twice destroys nothing, so the attempt is charged before the request and a
 lost response is retried rather than left ambiguous.
 
-```
+```text
 Any structlog call anywhere
   └─ processor appends to a bounded in-memory deque and returns   (never blocks, never raises)
        │   full? drop the OLDEST and count it — logging must not stall a backup
@@ -282,9 +282,9 @@ chain, which is what stops the writer's own queries from generating the lines de
 ## 8. Trust boundaries and threat model
 
 | Boundary | Control |
-|---|---|
+| --- | --- |
 | Browser → Dashboard | TLS; JWT access token (15 min, memory only); refresh token in `HttpOnly; Secure; SameSite=Strict` cookie; CSRF double-submit token on all cookie-authenticated mutations; login rate-limited per IP+username with exponential lockout |
-| Dashboard → Agent | mTLS with a pinned client certificate, **plus** HMAC-SHA256 request signature over `method|path|timestamp|nonce|sha256(body)`; ±60 s clock window; nonce cache rejects replay; agent firewalled to the LXC address |
+| Dashboard → Agent | mTLS with a pinned client certificate, **plus** HMAC-SHA256 request signature over `method\|path\|timestamp\|nonce\|sha256(body)`; ±60 s clock window; nonce cache rejects replay; agent firewalled to the LXC address |
 | Dashboard → PVE API | Dedicated API **token** with `PVEAuditor` role only — read-only inventory and storage stats. It cannot start, stop or delete anything |
 | Dashboard → Telegram | Egress only; bot token encrypted at rest (Fernet, key from `PROXSYNC_SECRET_KEY` env, never in the database) |
 | Agent → filesystem | Path canonicalisation + root-containment check; deletes restricted to files matching the vzdump artifact pattern under the dump root |
@@ -295,7 +295,7 @@ and multi-tenant RBAC beyond `admin`/`operator`/`viewer`.
 ## 9. Failure handling
 
 | Failure | Behaviour |
-|---|---|
+| --- | --- |
 | Agent unreachable | Circuit breaker opens after 3 consecutive failures; dashboard shows a persistent banner; scheduled jobs are marked `skipped_agent_unavailable`, never silently dropped |
 | Dashboard restarts mid-backup | Task poller reconciles on boot: any `running` history row with an `agent_task_id` is re-queried; the agent's on-disk task journal survives its own restart too |
 | Upload fails | Exponential backoff, configurable retry count; backup stays `upload_status=failed`; retention refuses to delete anything that depends on it |

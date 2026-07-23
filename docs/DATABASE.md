@@ -6,7 +6,7 @@ configuration change plus `alembic upgrade head`, not a rewrite.
 ## 1. Portability rules
 
 | Rule | Reason |
-|---|---|
+| --- | --- |
 | Surrogate `BIGINT` primary keys, never `ROWID` semantics | Identical on both engines |
 | `DateTime(timezone=True)`, all values stored **UTC** | SQLite has no native tz; the app normalises on write and renders in the user's timezone |
 | Enumerations stored as `VARCHAR` + `CHECK` constraint, mirrored by a Python `StrEnum` | Native `ENUM` types are PostgreSQL-only and painful to alter |
@@ -59,7 +59,7 @@ erDiagram
 ### 3.1 `users`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `username` | VARCHAR(64) | UNIQUE, case-folded on write |
 | `email` | VARCHAR(255) | UNIQUE, nullable |
@@ -78,7 +78,7 @@ Roles: `admin` = everything including settings and users; `operator` = run backu
 ### 3.2 `refresh_tokens`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `user_id` | BIGINT FK → users ON DELETE CASCADE | |
 | `token_hash` | CHAR(64) | SHA-256 of the token; the token itself is never stored |
@@ -94,7 +94,7 @@ Index: `(user_id, expires_at)`, UNIQUE `(token_hash)`.
 Typed key–value store, one row per setting, grouped by section.
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `section` | VARCHAR(32) | `general`, `gdrive`, `telegram`, `retention`, `agent`, `proxmox` |
 | `key` | VARCHAR(64) | UNIQUE together with `section` |
@@ -113,7 +113,7 @@ Defaults seeded by migration: `general.timezone=Asia/Jakarta`,
 ### 3.4 `guests` — cached PVE inventory
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `vmid` | INTEGER | UNIQUE together with `node` |
 | `guest_type` | VARCHAR(8) | CHECK in (`vm`,`lxc`) |
@@ -127,7 +127,7 @@ Defaults seeded by migration: `general.timezone=Asia/Jakarta`,
 ### 3.5 `backup_jobs`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `name` | VARCHAR(128) | UNIQUE |
 | `enabled` | BOOLEAN | |
@@ -152,7 +152,7 @@ Defaults seeded by migration: `general.timezone=Asia/Jakarta`,
 ### 3.7 `backup_runs` — one execution of a job or a manual trigger
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `job_id` | BIGINT FK → backup_jobs, nullable | null for manual runs |
 | `trigger` | VARCHAR(16) | `schedule`,`manual`,`api` |
@@ -170,7 +170,7 @@ Defaults seeded by migration: `general.timezone=Asia/Jakarta`,
 The central table.
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `run_id` | BIGINT FK → backup_runs ON DELETE SET NULL | |
 | `guest_id` | BIGINT FK → guests | |
@@ -208,7 +208,7 @@ markers are the authoritative location state.
 ### 3.9 `sync_tasks` — rclone transfers
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `backup_id` | BIGINT FK → backup_history, nullable | null for a full-folder sync |
 | `direction` | VARCHAR(16) | `upload`,`download`,`verify` |
@@ -224,7 +224,7 @@ markers are the authoritative location state.
 ### 3.10 `restore_history`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `backup_id` | BIGINT FK → backup_history | |
 | `source` | VARCHAR(16) | `local`,`gdrive` (a Drive restore downloads first) |
@@ -253,7 +253,7 @@ The table is also the executor's queue: rows are claimed in `confirmed`, oldest 
 ### 3.11 `retention_events`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `backup_id` | BIGINT FK → backup_history ON DELETE SET NULL | |
 | `vmid`, `guest_type` | | Denormalised |
@@ -267,7 +267,7 @@ The table is also the executor's queue: rows are claimed in `confirmed`, oldest 
 ### 3.12 `logs`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `ts` | TIMESTAMPTZ | |
 | `level` | VARCHAR(8) | `debug`,`info`,`warning`,`error`,`critical` |
@@ -289,7 +289,7 @@ than rejected. The ids remain in `context`, so nothing is lost but the join.
 ### 3.13 `notifications`
 
 | Column | Type | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `id` | BIGINT PK | |
 | `channel` | VARCHAR(16) | `telegram` (extensible) |
 | `event_type` | VARCHAR(32) | `backup_started`,`backup_success`,`backup_failed`,`restore_started`,`restore_finished`,`restore_failed`,`upload_failed`,`retention_deleted`,`storage_threshold`,`test` |
