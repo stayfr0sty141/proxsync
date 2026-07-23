@@ -32,7 +32,7 @@ in docs/HANDOFF.md.
   restore worker.
 - **Telegram & logs (M7)** — a transactional outbox with at-least-once delivery, duplicate-storm
   suppression, a send-only Telegram client, and non-blocking log persistence behind `/logs`.
-- **Frontend (M8)** — Next.js 15 / React 19 dashboard: every page from docs/UI.md, real-time
+- **Frontend (M8)** — Next.js 16 / React 19 dashboard: every page from docs/UI.md, real-time
   SSE wiring, four explicit data states (loading/empty/error/partial), and AA-accessible
   status indicators.
 - **Packaging & release (M9)** — `deploy/lxc/install.sh` container provisioning, nginx reverse
@@ -48,5 +48,5 @@ primary keys never autoincrementing on SQLite; a weekly schedule firing on the w
 run queue that was accidentally a stack; `rstrip("/s")` destroying transfer sizes; and a lost
 agent response being misread as a definitive failure.
 
-[Unreleased]: https://github.com/ProxSync/ProxSync/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/ProxSync/ProxSync/releases/tag/v0.1.0
+[Unreleased]: https://github.com/stayfr0sty141/proxsync/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/stayfr0sty141/proxsync/releases/tag/v0.1.0

@@ -36,7 +36,7 @@ make frontend-check  # frontend only
 ```
 
 The backend needs **Python 3.13**; the agent targets **≥3.11** so it runs on PVE 8.
-`BACKEND_PYTHON` in the Makefile points at the 3.13 interpreter. The frontend is **Next.js 15 /
+`BACKEND_PYTHON` in the Makefile points at the 3.13 interpreter. The frontend is **Next.js 16 /
 React 19 / Node**; `make frontend-install` bootstraps it.
 
 ---

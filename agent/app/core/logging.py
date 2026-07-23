@@ -45,13 +45,16 @@ def configure_logging(*, level: str = "INFO", json_output: bool = True) -> None:
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
     ]
-    processors.append(
-        structlog.processors.JSONRenderer()
-        if json_output
-        else structlog.dev.ConsoleRenderer(colors=sys.stdout.isatty())
-    )
+    if json_output:
+        processors.extend(
+            [
+                structlog.processors.format_exc_info,
+                structlog.processors.JSONRenderer(),
+            ]
+        )
+    else:
+        processors.append(structlog.dev.ConsoleRenderer(colors=sys.stdout.isatty()))
 
     structlog.configure(
         processors=processors,

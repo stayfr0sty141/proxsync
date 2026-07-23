@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -97,11 +97,7 @@ function SectionForm({
   const [values, setValues] = useState<Record<string, unknown>>(data.values);
   const [secretEdits, setSecretEdits] = useState<Record<string, string>>({});
 
-  // Reset local state when the section (and therefore its data) changes.
-  useEffect(() => {
-    setValues(data.values);
-    setSecretEdits({});
-  }, [data]);
+
 
   const save = useInvalidatingMutation(
     (payload: Record<string, unknown>) => api.put(`/settings/${section}`, payload),

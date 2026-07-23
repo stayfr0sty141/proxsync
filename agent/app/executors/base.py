@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TextIO
 
 from app.core.errors import ExecutionFailed, ValidationFailed
 from app.core.logging import logger
@@ -72,12 +73,7 @@ class ProcessHandle:
         if process is None or process.returncode is not None:
             return False
         self._cancelled = True
-        _signal_group(process.pid, signal.SIGTERM)
-        try:
-            async with asyncio.timeout(grace_seconds):
-                await process.wait()
-        except TimeoutError:
-            _signal_group(process.pid, signal.SIGKILL)
+        await _terminate_process_group(process, grace_seconds)
         return True
 
 
@@ -93,11 +89,54 @@ def _signal_group(pid: int | None, sig: signal.Signals) -> None:
             os.kill(pid, sig)
         else:
             os.killpg(pgid, sig)
-    except ProcessLookupError:
-        pass
-    except (PermissionError, OSError):  # pragma: no cover - defensive fallback
-        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+    except OSError:
+        with contextlib.suppress(OSError):
             os.kill(pid, sig)
+
+
+async def _terminate_process_group(
+    process: asyncio.subprocess.Process, grace_seconds: float = 2.0
+) -> None:
+    """Send SIGTERM to process group, waiting up to grace_seconds before falling back to SIGKILL."""
+    _signal_group(process.pid, signal.SIGTERM)
+    try:
+        async with asyncio.timeout(grace_seconds):
+            await process.wait()
+    except Exception:
+        _signal_group(process.pid, signal.SIGKILL)
+        with contextlib.suppress(Exception):
+            await process.wait()
+
+
+async def _pump_stdout(
+    stream: asyncio.StreamReader,
+    log_file: TextIO,
+    tail: list[str],
+    tail_lines: int,
+    on_line: LineHandler | None,
+) -> None:
+    """Pump process stdout lines into the task log file and maintain the tail buffer."""
+    async for raw in stream:
+        line = raw.decode("utf-8", errors="replace").rstrip("\n")
+        log_file.write(line + "\n")
+        log_file.flush()
+        tail.append(line)
+        if len(tail) > tail_lines:
+            del tail[0]
+        if on_line is not None:
+            try:
+                on_line(line)
+            except Exception:  # noqa: BLE001 - a parser bug must not kill the task
+                logger.warning("line_handler_failed", line=line, exc_info=True)
+
+
+def _prepare_log_file(log_path: Path, command: Sequence[str]) -> TextIO:
+    """Prepare log directory and open task log file with command header."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_file = log_path.open("a", encoding="utf-8", errors="replace")
+    log_file.write(f"$ {' '.join(command)}\n")
+    log_file.flush()
+    return log_file
 
 
 def validate_argv(argv: Sequence[str]) -> list[str]:
@@ -134,13 +173,10 @@ class ProcessRunner:
         tail: list[str] = []
         timed_out = False
 
-        log_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("process_start", executable=command[0], argc=len(command), log=str(log_path))
 
-        with log_path.open("a", encoding="utf-8", errors="replace") as log_file:
-            log_file.write(f"$ {' '.join(command)}\n")
-            log_file.flush()
-
+        log_file = _prepare_log_file(log_path, command)
+        try:
             process = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
@@ -154,35 +190,20 @@ class ProcessRunner:
 
             assert process.stdout is not None
 
-            async def pump() -> None:
-                async for raw in process.stdout:  # type: ignore[union-attr]
-                    line = raw.decode("utf-8", errors="replace").rstrip("\n")
-                    log_file.write(line + "\n")
-                    log_file.flush()
-                    tail.append(line)
-                    if len(tail) > self._tail_lines:
-                        del tail[0]
-                    if on_line is not None:
-                        try:
-                            on_line(line)
-                        except Exception:  # noqa: BLE001 - a parser bug must not kill the task
-                            logger.warning("line_handler_failed", line=line, exc_info=True)
-
             try:
                 async with asyncio.timeout(timeout_seconds):
-                    await pump()
+                    await _pump_stdout(process.stdout, log_file, tail, self._tail_lines, on_line)
                     await process.wait()
             except TimeoutError:
                 timed_out = True
                 logger.error("process_timeout", executable=command[0], timeout=timeout_seconds)
-                _signal_group(process.pid, signal.SIGTERM)
-                try:
-                    async with asyncio.timeout(self._grace):
-                        await process.wait()
-                except TimeoutError:
-                    _signal_group(process.pid, signal.SIGKILL)
-                    await process.wait()
+                await _terminate_process_group(process, self._grace)
                 log_file.write(f"\n[proxsync] terminated after {timeout_seconds}s timeout\n")
+            except BaseException:
+                await _terminate_process_group(process, self._grace)
+                raise
+        finally:
+            log_file.close()
 
         exit_code = process.returncode if process.returncode is not None else -1
         result = ProcessResult(
@@ -216,14 +237,10 @@ class ProcessRunner:
             async with asyncio.timeout(timeout_seconds):
                 stdout, _ = await process.communicate()
         except TimeoutError:
-            _signal_group(process.pid, signal.SIGKILL)
-            with contextlib.suppress(Exception):
-                await process.wait()
+            await _terminate_process_group(process, 2.0)
             raise ExecutionFailed(f"'{command[0]}' timed out after {timeout_seconds}s") from None
-        except Exception:
-            _signal_group(process.pid, signal.SIGKILL)
-            with contextlib.suppress(Exception):
-                await process.wait()
+        except BaseException:
+            await _terminate_process_group(process, 2.0)
             raise
 
         return process.returncode or 0, stdout.decode("utf-8", errors="replace")

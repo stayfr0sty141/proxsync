@@ -6,10 +6,6 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   output: "standalone",
-  eslint: {
-    // Lint is run explicitly in CI (`npm run lint`); don't fail `next build` on it.
-    ignoreDuringBuilds: true,
-  },
   async rewrites() {
     // In development the Next dev server proxies the API so the browser talks to a
     // single origin (matching the nginx deployment where /api/* and /* share a host).

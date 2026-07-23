@@ -261,7 +261,7 @@ the error classification — but no message has yet left the LXC.
 
 ## M8 — Frontend ✅
 
-Built page by page against the finished API, Next.js 15 (App Router) · React 19 · TypeScript ·
+Built page by page against the finished API, Next.js 16 (App Router) · React 19 · TypeScript ·
 Tailwind v4 · TanStack Query v5 · Recharts · Vitest.
 
 - ✅ **Foundation** — design tokens (dark-first, layered surfaces, light theme behind the same
