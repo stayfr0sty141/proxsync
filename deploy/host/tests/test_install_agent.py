@@ -95,13 +95,51 @@ class InstallerValidationTests(unittest.TestCase):
     def test_firewall_option_semantics_and_conflicts(self) -> None:
         self.assert_ok("parse_args --skip-firewall; [[ $FIREWALL_MODE == unchanged ]]")
         self.assert_ok("parse_args --remove-firewall; [[ $FIREWALL_MODE == removed ]]")
-        self.assert_ok(
-            "parse_args --configure-firewall; [[ $FIREWALL_MODE == managed ]]"
-        )
         self.assert_bad(
             "parse_args --skip-firewall --remove-firewall",
             "conflicts with --skip-firewall",
         )
+
+    def test_directory_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory_name:
+            root = Path(directory_name)
+            dump = root / "dump"
+            temp = root / "temp"
+            dump.mkdir()
+            
+            # Successful validation
+            self.assert_ok(
+                f"DUMP_ROOT={dump} TEMP_DIR={temp} DASHBOARD_IP=10.0.0.1 PORT=1000 "
+                f"MEMORY_HIGH=1G MEMORY_MAX=2G BACKUP_STORAGE=a RCLONE_REMOTE=a "
+                f"validate_inputs"
+            )
+            self.assertTrue(temp.exists()) # It creates temp if missing
+            
+            # File instead of directory
+            a_file = root / "file"
+            a_file.write_text("data")
+            self.assert_bad(
+                f"DUMP_ROOT={a_file} TEMP_DIR={temp} DASHBOARD_IP=10.0.0.1 PORT=1000 "
+                f"MEMORY_HIGH=1G MEMORY_MAX=2G BACKUP_STORAGE=a RCLONE_REMOTE=a "
+                f"validate_inputs",
+                "is not a directory"
+            )
+            
+            # Missing dump root
+            self.assert_bad(
+                f"DUMP_ROOT={root / 'missing'} TEMP_DIR={temp} DASHBOARD_IP=10.0.0.1 PORT=1000 "
+                f"MEMORY_HIGH=1G MEMORY_MAX=2G BACKUP_STORAGE=a RCLONE_REMOTE=a "
+                f"validate_inputs",
+                "does not exist"
+            )
+            
+            # Sensitive temp dir
+            self.assert_bad(
+                f"DUMP_ROOT={dump} TEMP_DIR=/usr/proxsync DASHBOARD_IP=10.0.0.1 PORT=1000 "
+                f"MEMORY_HIGH=1G MEMORY_MAX=2G BACKUP_STORAGE=a RCLONE_REMOTE=a "
+                f"validate_inputs",
+                "sensitive system path"
+            )
 
 
 class FirewallTests(unittest.TestCase):

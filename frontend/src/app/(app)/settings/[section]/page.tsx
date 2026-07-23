@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -93,6 +94,7 @@ function SectionForm({
 }: Readonly<{
   section: string;
   data: SectionResponse;
+  key?: string;
 }>) {
   const [values, setValues] = useState<Record<string, unknown>>(data.values);
   const [secretEdits, setSecretEdits] = useState<Record<string, string>>({});
@@ -114,7 +116,7 @@ function SectionForm({
         toast.success("Settings saved");
         setSecretEdits({});
       },
-      onError: (err) =>
+      onError: (err: unknown) =>
         toast.error(
           err instanceof ApiError ? err.problem.detail || err.problem.title : "Save failed",
         ),
@@ -135,8 +137,8 @@ function SectionForm({
             <Input
               id={key}
               value={stringifyValue(value)}
-              onChange={(e) =>
-                setValues((prev) => ({ ...prev, [key]: coerce(value, e.target.value) }))
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setValues((prev: Record<string, unknown>) => ({ ...prev, [key]: coerce(value, e.target.value) }))
               }
             />
           </div>
@@ -151,7 +153,7 @@ function SectionForm({
                 type="password"
                 placeholder="Enter new value"
                 value={secretEdits[key]}
-                onChange={(e) => setSecretEdits((prev) => ({ ...prev, [key]: e.target.value }))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSecretEdits((prev: Record<string, string>) => ({ ...prev, [key]: e.target.value }))}
               />
             ) : (
               <div className="flex items-center gap-2">
@@ -159,7 +161,7 @@ function SectionForm({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setSecretEdits((prev) => ({ ...prev, [key]: "" }))}
+                  onClick={() => setSecretEdits((prev: Record<string, string>) => ({ ...prev, [key]: "" }))}
                 >
                   Replace
                 </Button>

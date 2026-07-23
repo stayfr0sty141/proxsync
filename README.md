@@ -65,10 +65,10 @@ credentials the dashboard needs:
 
 ```bash
 # 1️⃣ On the Proxmox host:
-cd ProxSync/deploy/host && ./install-agent.sh --agent-ip 10.0.0.10 --dashboard-ip 10.0.0.20
+cd proxsync/deploy/host && ./install-agent.sh --agent-ip 10.0.0.10 --dashboard-ip 10.0.0.20
 
 # 2️⃣ In the unprivileged LXC:
-cd ProxSync/deploy/lxc && ./install.sh --server-name proxsync.lan --agent-ip 10.0.0.10
+cd proxsync/deploy/lxc && ./install.sh --server-name proxsync.lan --agent-ip 10.0.0.10
 ```
 
 Full walkthrough — including mTLS credential exchange, PVEAuditor token setup, and

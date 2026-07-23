@@ -68,7 +68,7 @@ Two machines: the **agent** on the Proxmox host, the **dashboard** in an LXC.
 ### 1.2 Run the installer
 
 ```bash
-cd ProxSync/deploy/host
+cd proxsync/deploy/host
 ./install-agent.sh --dashboard-ip <LXC_IP> --dump-root /mnt/backup-hdd/dump
 ```
 
@@ -109,7 +109,7 @@ apt install -y python3 python3-venv nodejs npm nginx sqlite3 openssl
 ### 2.2 Run the installer
 
 ```bash
-cd ProxSync/deploy/lxc
+cd proxsync/deploy/lxc
 ./install.sh --server-name <SERVER_NAME> --agent-ip <HOST_IP>
 ```
 
@@ -124,27 +124,12 @@ cd ProxSync/deploy/lxc
 
 ### 3.1 Copy the agent's client certificates into the LXC
 
-```bash
-# From the LXC:
-scp root@<HOST_IP>:/etc/proxsync-agent/tls/{ca.crt,dashboard.crt,dashboard.key} /etc/proxsync/
-mv /etc/proxsync/ca.crt        /etc/proxsync/agent-ca.crt
-mv /etc/proxsync/dashboard.crt /etc/proxsync/agent-client.crt
-mv /etc/proxsync/dashboard.key /etc/proxsync/agent-client.key
-chown root:proxsync /etc/proxsync/agent-*.crt /etc/proxsync/agent-client.key
-chmod 0640 /etc/proxsync/agent-client.key
-```
-
-- **Verify:** the three `agent-*` files exist in `/etc/proxsync/`
-
-### 3.2 Fill in the secrets
-
-Edit `/etc/proxsync/api.env` and set:
-
-```ini
-PROXSYNC_AGENT_HMAC_SECRET=<HMAC secret read as root from the agent env file>
-PROXSYNC_PROXMOX_TOKEN_ID=proxsync@pve!dashboard
-PROXSYNC_PROXMOX_TOKEN_SECRET=<token secret>
-```
+- [ ] Use `scp` to copy the `--export-dashboard-bundle` output from the host to the dashboard container (`/etc/proxsync/proxsync-bundle/`).
+- [ ] Move `ca.crt`, `dashboard.crt`, and `dashboard.key` from the bundle to `/etc/proxsync/`, renaming them to `agent-ca.crt`, `agent-client.crt`, and `agent-client.key` respectively.
+- [ ] Set permissions: `chown root:proxsync /etc/proxsync/agent-*.crt /etc/proxsync/agent-client.key` and `chmod 0640 /etc/proxsync/agent-client.key`.
+- [ ] Get the HMAC secret from `/etc/proxsync/proxsync-bundle/env.fragment`; set `PROXSYNC_AGENT_HMAC_SECRET` in `/etc/proxsync/api.env`.
+- [ ] Set `PROXSYNC_PROXMOX_TOKEN_ID` and `PROXSYNC_PROXMOX_TOKEN_SECRET` in `/etc/proxsync/api.env`.
+- [ ] Delete the bundle directory from both the host and the container.
 
 - [ ] Set the three values above
 - [ ] Restart: `systemctl restart proxsync-api`

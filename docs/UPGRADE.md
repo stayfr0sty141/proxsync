@@ -11,7 +11,7 @@ are not stopped until the last safe moment.
 From a fresh checkout (or after `git pull`) of the new version, inside the LXC container:
 
 ```bash
-cd ProxSync
+cd proxsync
 ./scripts/proxsync-upgrade.sh --repo "$(pwd)"
 ```
 

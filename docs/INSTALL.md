@@ -7,7 +7,7 @@ ProxSync is two components that are installed separately and then introduced to 
 | **Backup Agent** | The Proxmox VE host, as root | `deploy/host/install-agent.sh` |
 | **Dashboard** (API + Web UI) | An unprivileged LXC container | `deploy/lxc/install.sh` |
 
-Install the **agent first** — it prints the credentials the dashboard needs.
+Install the **agent first** — it generates the certificate and secret the dashboard needs.
 
 > All commands assume a checkout of this repository is present on each machine. Clone it, or
 > copy the tree across with `scp`/`rsync`.
@@ -41,42 +41,42 @@ apt install -y python3 python3-venv nodejs npm nginx sqlite3 openssl
 ## 1. Install the Backup Agent (Proxmox host)
 
 ```bash
-cd ProxSync/deploy/host
+cd proxsync/deploy/host
+mkdir -m 0700 /root/proxsync-bundle
 ./install-agent.sh \
   --dashboard-ip 10.0.0.20 \
   --dump-root /mnt/backup-hdd/dump \
-  --rclone-config /root/.config/rclone/rclone.conf \
-  --rclone-remote gdrive
+  --temp-dir /mnt/backup-hdd/tmp \
+  --export-dashboard-bundle /root/proxsync-bundle
 ```
 
 `--dashboard-ip` is the address of the LXC container that will run the dashboard; the agent
 refuses connections from anywhere else at both the managed nftables firewall and application
-layers. The installer never prints the HMAC secret; retrieve it locally as root only when
-provisioning the dashboard:
+layers. The installer produces a certificate and HMAC secret for the dashboard, which are safely
+exported to the `--export-dashboard-bundle` directory. The private credential remains in this
+root-only directory and is not printed to stdout to avoid shell history leaks.
 
-```bash
-sed -n 's/^PROXSYNC_AGENT_HMAC_SECRET=//p' /etc/proxsync-agent/agent.env
-```
-
-It reports the agent URL and the three certificate files to copy to the dashboard:
-`ca.crt`, `dashboard.crt`, and `dashboard.key`.
+Transfer the bundle to the dashboard container securely (e.g. via `scp`) and then delete the bundle directory on the host.
 
 ### Firewall lifecycle
 
-The default `--configure-firewall` mode owns only `table inet proxsync`. It writes
-`/etc/nftables.d/proxsync.nft` and enables `proxsync-firewall.service`, whose loader replaces
-that table in one checked nftables transaction before `proxsync-agent.service` starts. It does
-not flush the global ruleset, hook outbound traffic, enable the global nftables service, or
-modify Proxmox Firewall, iptables-compatibility rules, user tables, or other service ports.
+The default `--configure-firewall` mode is fail-closed. The agent heavily depends on the `proxsync-firewall.service`; if the firewall fails to load, the agent will refuse to start. This guarantees that your network protections are active before the agent listens on its port.
 
-- `--configure-firewall` creates or deterministically updates runtime and boot-persistent rules.
-- `--skip-firewall` changes nothing. Existing ProxSync rules remain active and the installer
-  warns about them.
-- `--remove-firewall` removes only the ProxSync table, fragment, loader, and unit.
+The installer owns `table inet proxsync`. It creates `/etc/nftables.d/proxsync.nft` and a secure ownership marker file to ensure it never accidentally destroys an unrelated firewall table sharing the same name.
 
-Native nftables, Proxmox Firewall, and iptables compatibility may coexist, but their independent
-input chains can still reject a connection before or after ProxSync's chain. Do not create a
-second `table inet proxsync`; that name is reserved for this installer.
+- `--configure-firewall` creates or deterministically updates runtime and boot-persistent rules, as well as the agent dependency drop-in.
+- `--skip-firewall` changes nothing. Existing ProxSync rules remain active.
+- `--remove-firewall` removes only the ProxSync table, loader, agent dependency drop-in, and unit, but strictly verifies ownership first.
+
+You can check firewall state using:
+```bash
+systemctl status proxsync-firewall
+systemctl show proxsync-agent -p Requires -p After
+nft list table inet proxsync
+```
+
+Native nftables, Proxmox Firewall, and iptables compatibility may coexist. Do not create a
+second `table inet proxsync`; a collision will cause the installer to abort to protect your existing table.
 
 ### Safe reruns, PKI repair, and rollback
 
@@ -120,7 +120,7 @@ The last command prints a **token id** (`proxsync@pve!dashboard`) and a **secret
 ## 3. Install the Dashboard (LXC container)
 
 ```bash
-cd ProxSync/deploy/lxc
+cd proxsync/deploy/lxc
 ./install.sh --server-name proxsync.lan --agent-ip 10.0.0.10
 ```
 
@@ -135,14 +135,14 @@ It prints a generated **first-run administrator** password. Save it.
 
 ## 4. Introduce the two components
 
-Copy the agent's client credentials into the container, then fill in the secrets:
+Copy the agent's client credentials bundle into the container, then fill in the secrets:
 
 ```bash
 # From the dashboard container:
-scp root@10.0.0.10:/etc/proxsync-agent/tls/{ca.crt,dashboard.crt,dashboard.key} /etc/proxsync/
-mv /etc/proxsync/ca.crt         /etc/proxsync/agent-ca.crt
-mv /etc/proxsync/dashboard.crt  /etc/proxsync/agent-client.crt
-mv /etc/proxsync/dashboard.key  /etc/proxsync/agent-client.key
+scp -r root@10.0.0.10:/root/proxsync-bundle /etc/proxsync/
+mv /etc/proxsync/proxsync-bundle/ca.crt         /etc/proxsync/agent-ca.crt
+mv /etc/proxsync/proxsync-bundle/dashboard.crt  /etc/proxsync/agent-client.crt
+mv /etc/proxsync/proxsync-bundle/dashboard.key  /etc/proxsync/agent-client.key
 chown root:proxsync /etc/proxsync/agent-*.crt /etc/proxsync/agent-client.key
 chmod 0640 /etc/proxsync/agent-client.key
 ```
@@ -150,10 +150,12 @@ chmod 0640 /etc/proxsync/agent-client.key
 Edit `/etc/proxsync/api.env` and set:
 
 ```ini
-PROXSYNC_AGENT_HMAC_SECRET=<the HMAC secret read locally from the agent env file>
+PROXSYNC_AGENT_HMAC_SECRET=<the HMAC secret found in /etc/proxsync/proxsync-bundle/env.fragment>
 PROXSYNC_PROXMOX_TOKEN_ID=proxsync@pve!dashboard
 PROXSYNC_PROXMOX_TOKEN_SECRET=<the token secret>
 ```
+
+After configuring, securely erase the bundle in both locations.
 
 Restart the API:
 
