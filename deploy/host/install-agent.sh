@@ -687,9 +687,9 @@ restore_path() {
 begin_transaction() {
     BACKUP_DIR="${WORK_DIR}/backup"
     install -d -m 0700 "$BACKUP_DIR"
-    systemctl is-active --quiet "$SERVICE" && OLD_SERVICE_ACTIVE=1 || true
-    systemctl is-enabled --quiet "$SERVICE" && OLD_SERVICE_ENABLED=1 || true
-    systemctl is-enabled --quiet "$FIREWALL_SERVICE" && OLD_FIREWALL_ENABLED=1 || true
+    if systemctl is-active --quiet "$SERVICE"; then OLD_SERVICE_ACTIVE=1; fi
+    if systemctl is-enabled --quiet "$SERVICE"; then OLD_SERVICE_ENABLED=1; fi
+    if systemctl is-enabled --quiet "$FIREWALL_SERVICE"; then OLD_FIREWALL_ENABLED=1; fi
     snapshot_path "$INSTALL_DIR" install
     snapshot_path "$CONFIG_DIR" config
     snapshot_path "$UNIT_FILE" agent-unit
@@ -857,7 +857,9 @@ uninstall() {
     systemctl disable "$SERVICE" >/dev/null 2>&1 || true
     systemctl stop "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
     systemctl disable "$FIREWALL_SERVICE" >/dev/null 2>&1 || true
-    command -v nft >/dev/null 2>&1 && nft delete table inet proxsync >/dev/null 2>&1 || true
+    if command -v nft >/dev/null 2>&1; then
+        nft delete table inet proxsync >/dev/null 2>&1 || true
+    fi
     rm -f "$UNIT_FILE" "$FIREWALL_FILE" "$FIREWALL_LOADER" "$FIREWALL_UNIT"
     rm -rf "$INSTALL_DIR" "$CONFIG_DIR" /var/lib/proxsync-agent /var/log/proxsync-agent
     systemctl daemon-reload
@@ -1010,11 +1012,13 @@ install_agent() {
     "${INSTALL_DIR}/venv/bin/pip" install --quiet "$INSTALL_DIR"
 
     install -d -m 0750 "$CONFIG_DIR" "$TLS_DIR"
-    local file
+    local file mode
     for file in ca.crt ca.key server.crt server.key dashboard.crt dashboard.key; do
-        [[ -f "${staged_tls}/${file}" ]] &&
-            atomic_install "${staged_tls}/${file}" "${TLS_DIR}/${file}" \
-                "$([[ "$file" == *.key ]] && printf 0640 || printf 0644)"
+        if [[ -f "${staged_tls}/${file}" ]]; then
+            mode=0644
+            if [[ "$file" == *.key ]]; then mode=0640; fi
+            atomic_install "${staged_tls}/${file}" "${TLS_DIR}/${file}" "$mode"
+        fi
     done
     atomic_install "$staged_env" "$ENV_FILE" 0640
     atomic_install "$staged_unit" "$UNIT_FILE" 0644
