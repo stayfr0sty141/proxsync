@@ -97,8 +97,6 @@ function SectionForm({
   const [values, setValues] = useState<Record<string, unknown>>(data.values);
   const [secretEdits, setSecretEdits] = useState<Record<string, string>>({});
 
-
-
   const save = useInvalidatingMutation(
     (payload: Record<string, unknown>) => api.put(`/settings/${section}`, payload),
     [queryDomains.storage],

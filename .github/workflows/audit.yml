@@ -30,9 +30,9 @@ jobs:
       matrix:
         component: [backend, agent]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
           cache: pip
@@ -44,10 +44,10 @@ jobs:
           pip install -e .
           pip install pip-audit
 
-      - name: Audit installed dependencies
+      - name: Audit project dependencies
         working-directory: ${{ matrix.component }}
-        # Audits the resolved environment, so transitive dependencies are covered too.
-        run: pip-audit --strict --desc
+        # Resolve the local project graph without asking PyPI for the private project itself.
+        run: pip-audit --strict --desc=on .
 
   node:
     runs-on: ubuntu-latest
@@ -55,11 +55,11 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
