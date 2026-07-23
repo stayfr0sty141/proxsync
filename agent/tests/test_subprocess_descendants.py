@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from app.core.errors import ExecutionFailed
-from app.executors.base import ProcessHandle, ProcessRunner, _signal_group
+from app.executors.base import ProcessHandle, ProcessResult, ProcessRunner, _signal_group
 
 
 def _is_process_alive(pid: int) -> bool:
@@ -183,3 +183,27 @@ async def test_process_handle_cancellation(tmp_path: Path) -> None:
     assert cancelled is True
     result = await task
     assert result.cancelled is True
+
+
+@pytest.mark.asyncio
+async def test_process_finishing_near_timeout_no_error(tmp_path: Path) -> None:
+    """A process that exits at roughly the same moment as the timeout must not raise."""
+    runner = ProcessRunner(cancel_grace_seconds=1)
+    log_path = tmp_path / "race.log"
+
+    # Sleep just under the timeout so exit and timeout race each other.
+    result = await runner.run_logged(["/bin/sleep", "0.9"], log_path=log_path, timeout_seconds=1)
+    # Whether the process wins or the timeout fires first, we must get a
+    # ProcessResult — never an unhandled exception.
+    assert isinstance(result, ProcessResult)
+    # Either the process finished normally or timed out; both are acceptable.
+    assert result.exit_code is not None
+
+
+@pytest.mark.asyncio
+async def test_run_capture_normal_command_returns_output() -> None:
+    """A simple, fast command returns its stdout through run_capture."""
+    runner = ProcessRunner()
+    code, output = await runner.run_capture(["/bin/echo", "hello"], timeout_seconds=5)
+    assert code == 0
+    assert output.strip() == "hello"
