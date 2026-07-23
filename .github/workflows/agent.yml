@@ -20,9 +20,9 @@ jobs:
         # 3.11 = PVE 8 (Debian 12), 3.13 = PVE 9 (Debian 13). Both must pass.
         python-version: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -46,7 +46,7 @@ jobs:
   security-invariants:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: No shell execution anywhere in the repository
         run: |
@@ -94,7 +94,20 @@ jobs:
             bash -n "$script"
           done
 
+      - name: Install ShellCheck
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
       - name: Shellcheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: ./deploy
+        working-directory: .
+        run: shellcheck deploy/host/*.sh deploy/host/tests/*.sh deploy/lxc/*.sh
+
+      - name: Installer regression tests
+        working-directory: .
+        run: python3 -m unittest discover -s deploy/host/tests -p 'test_*.py' -v
+
+      - name: Firewall namespace integration test
+        working-directory: .
+        run: |
+          sudo apt-get install -y nftables netcat-openbsd
+          sudo bash deploy/host/tests/test-firewall-integration.sh
