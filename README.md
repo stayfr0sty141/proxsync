@@ -79,7 +79,7 @@ Full walkthrough — including mTLS credential exchange, PVEAuditor token setup,
 ## 📦 What's Inside
 
 ```text
-ProxSync/
+proxsync/
 ├── agent/            FastAPI backup agent — runs on PVE host as root
 ├── backend/          Dashboard API — FastAPI + SQLAlchemy + APScheduler
 ├── frontend/         Next.js App Router + TypeScript + Tailwind + shadcn/ui

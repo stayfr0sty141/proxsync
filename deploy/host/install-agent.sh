@@ -1135,7 +1135,7 @@ install_agent() {
     if [[ -f "$staged_rclone" ]]; then
         atomic_install "$staged_rclone" "$RCLONE_CONFIG" 0600
     fi
-    install -d -m 0755 "$TEMP_DIR"
+    install -d -m 0700 "$TEMP_DIR"
 
     case "$FIREWALL_MODE" in
         managed)
