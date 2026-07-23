@@ -20,9 +20,9 @@ jobs:
         # 3.11 = PVE 8 (Debian 12), 3.13 = PVE 9 (Debian 13). Both must pass.
         python-version: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -46,7 +46,7 @@ jobs:
   security-invariants:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: No shell execution anywhere in the repository
         run: |
@@ -59,7 +59,7 @@ jobs:
             echo "::error::os.system/os.popen are banned in ProxSync"
             exit 1
           fi
-          if grep -rn --include='*.py' -E 'subprocess\.(run|call|check_output|Popen)\(' agent/app ; then
+          if grep -rn --include='*.py' -E 'subprocess\.(run|call|check_output|Popen)\(' app ; then
             echo "::error::use ProcessRunner (create_subprocess_exec) rather than blocking subprocess APIs"
             exit 1
           fi
@@ -70,13 +70,13 @@ jobs:
           set -euo pipefail
           # The dashboard counts attempts and applies the backoff; a silent rclone retry
           # loop underneath would make `sync_tasks.attempt` a lie.
-          if ! grep -q '"--retries",' agent/app/executors/rclone.py ; then
+          if ! grep -q '"--retries",' app/executors/rclone.py ; then
             echo "::error::rclone must be invoked with an explicit --retries"
             exit 1
           fi
           # `copy` creates a directory named after the destination; `delete` removes a
           # directory's contents. Both are the wrong verb here, and dangerously so.
-          if grep -nE '"(copy|delete|purge|sync)"' agent/app/executors/rclone.py ; then
+          if grep -nE '"(copy|delete|purge|sync)"' app/executors/rclone.py ; then
             echo "::error::use copyto/deletefile — copy, delete, purge and sync act on directories"
             exit 1
           fi
@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           # Every shipped shell script must parse; a broken installer or maintenance script
           # only fails at the worst possible moment otherwise.
-          for script in deploy/host/install-agent.sh deploy/lxc/install.sh scripts/*.sh ; do
+          for script in ../deploy/host/install-agent.sh ../deploy/lxc/install.sh ../scripts/*.sh ; do
             [ -e "$script" ] || continue
             echo "bash -n $script"
             bash -n "$script"
