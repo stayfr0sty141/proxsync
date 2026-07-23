@@ -1,7 +1,6 @@
 name: Backend
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
     paths: ["backend/**", ".github/workflows/backend.yml"]
@@ -16,9 +15,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
@@ -52,16 +51,16 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_USER: proxsync
-          POSTGRES_PASSWORD: ${{ secrets.CI_PG_PASSWORD }}
+          POSTGRES_PASSWORD: proxsync
           POSTGRES_DB: proxsync
         options: >-
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
         ports: ["5432:5432"]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
@@ -75,7 +74,7 @@ jobs:
       - name: Migration applies to PostgreSQL
         env:
           PROXSYNC_SECRET_KEY: ci-only-not-a-real-secret-0123456789
-          PROXSYNC_DATABASE_URL: postgresql+asyncpg://proxsync:${{ secrets.CI_PG_PASSWORD }}@localhost:5432/proxsync
+          PROXSYNC_DATABASE_URL: postgresql+asyncpg://proxsync:proxsync@localhost:5432/proxsync
         run: |
           alembic upgrade head
           alembic downgrade base

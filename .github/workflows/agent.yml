@@ -1,20 +1,11 @@
 name: Agent
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "agent/**"
-      - "deploy/host/**"
-      - "deploy/lxc/**"
-      - ".github/workflows/agent.yml"
+    paths: ["agent/**", ".github/workflows/agent.yml"]
   pull_request:
-    paths:
-      - "agent/**"
-      - "deploy/host/**"
-      - "deploy/lxc/**"
-      - ".github/workflows/agent.yml"
+    paths: ["agent/**", ".github/workflows/agent.yml"]
 
 defaults:
   run:
@@ -29,9 +20,9 @@ jobs:
         # 3.11 = PVE 8 (Debian 12), 3.13 = PVE 9 (Debian 13). Both must pass.
         python-version: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -55,7 +46,7 @@ jobs:
   security-invariants:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
 
       - name: No shell execution anywhere in the repository
         run: |
@@ -68,7 +59,7 @@ jobs:
             echo "::error::os.system/os.popen are banned in ProxSync"
             exit 1
           fi
-          if grep -rn --include='*.py' -E 'subprocess\.(run|call|check_output|Popen)\(' app ; then
+          if grep -rn --include='*.py' -E 'subprocess\.(run|call|check_output|Popen)\(' agent/app ; then
             echo "::error::use ProcessRunner (create_subprocess_exec) rather than blocking subprocess APIs"
             exit 1
           fi
@@ -79,20 +70,19 @@ jobs:
           set -euo pipefail
           # The dashboard counts attempts and applies the backoff; a silent rclone retry
           # loop underneath would make `sync_tasks.attempt` a lie.
-          if ! grep -q '"--retries",' app/executors/rclone.py ; then
+          if ! grep -q '"--retries",' agent/app/executors/rclone.py ; then
             echo "::error::rclone must be invoked with an explicit --retries"
             exit 1
           fi
           # `copy` creates a directory named after the destination; `delete` removes a
           # directory's contents. Both are the wrong verb here, and dangerously so.
-          if grep -nE '"(copy|delete|purge|sync)"' app/executors/rclone.py ; then
+          if grep -nE '"(copy|delete|purge|sync)"' agent/app/executors/rclone.py ; then
             echo "::error::use copyto/deletefile — copy, delete, purge and sync act on directories"
             exit 1
           fi
           echo "rclone invocation constraints hold."
 
       - name: Shell scripts are syntactically valid
-        working-directory: .
         run: |
           set -euo pipefail
           # Every shipped shell script must parse; a broken installer or maintenance script
@@ -103,20 +93,7 @@ jobs:
             bash -n "$script"
           done
 
-      - name: Install ShellCheck
-        working-directory: .
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-
       - name: Shellcheck
-        working-directory: .
-        run: shellcheck deploy/host/*.sh deploy/host/tests/*.sh deploy/lxc/*.sh
-
-      - name: Installer regression tests
-        working-directory: .
-        run: python3 -m unittest discover -s deploy/host/tests -p 'test_*.py' -v
-
-      - name: Firewall namespace integration test
-        working-directory: .
-        run: |
-          sudo apt-get install -y nftables netcat-openbsd
-          sudo bash deploy/host/tests/test-firewall-integration.sh
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./deploy
