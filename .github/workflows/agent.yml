@@ -1,11 +1,20 @@
 name: Agent
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-    paths: ["agent/**", ".github/workflows/agent.yml"]
+    paths:
+      - "agent/**"
+      - "deploy/host/**"
+      - "deploy/lxc/**"
+      - ".github/workflows/agent.yml"
   pull_request:
-    paths: ["agent/**", ".github/workflows/agent.yml"]
+    paths:
+      - "agent/**"
+      - "deploy/host/**"
+      - "deploy/lxc/**"
+      - ".github/workflows/agent.yml"
 
 defaults:
   run:

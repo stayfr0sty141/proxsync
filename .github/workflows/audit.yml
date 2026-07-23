@@ -4,6 +4,7 @@ name: Dependency audit
 # disclosed CVE fails the scheduled run even when no code changed. Runs on every push to
 # main, on PRs that touch a dependency manifest, and weekly.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
