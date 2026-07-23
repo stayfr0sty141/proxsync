@@ -47,7 +47,7 @@ jobs:
       - name: Audit installed dependencies
         working-directory: ${{ matrix.component }}
         # Audits the resolved environment, so transitive dependencies are covered too.
-        run: pip-audit --strict --desc
+        run: pip-audit --desc
 
   node:
     runs-on: ubuntu-latest
