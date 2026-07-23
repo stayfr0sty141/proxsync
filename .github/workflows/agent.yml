@@ -20,7 +20,7 @@ jobs:
         # 3.11 = PVE 8 (Debian 12), 3.13 = PVE 9 (Debian 13). Both must pass.
         python-version: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
@@ -46,7 +46,7 @@ jobs:
   security-invariants:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: No shell execution anywhere in the repository
         run: |
