@@ -1,0 +1,47 @@
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+
+defaults:
+  run:
+    working-directory: frontend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      # The deployment copies .next/standalone; a build that does not produce it would break
+      # install.sh in a way no unit test can catch. Assert the artifact exists.
+      - name: Build (standalone output)
+        run: npm run build
+
+      - name: Standalone server was produced
+        run: test -f .next/standalone/server.js

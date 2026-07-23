@@ -1,0 +1,66 @@
+# ProxSync Web UI — Next.js standalone server, runs in the unprivileged LXC.
+#
+# `next build` with output: "standalone" produces a self-contained server at
+# /opt/proxsync/frontend/server.js that needs only Node and the bundled node_modules. It binds
+# to 127.0.0.1:3000; nginx serves it on :443 and forwards /api/* to proxsync-api instead.
+#
+# The UI holds no secrets and reaches nothing but the browser — it never talks to the API
+# server-side (the browser does, same-origin through nginx), so this unit is locked down hard.
+#
+# Installed and enabled by deploy/lxc/install.sh.
+
+[Unit]
+Description=ProxSync Web UI (Next.js)
+Documentation=https://github.com/ProxSync/ProxSync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=proxsync
+Group=proxsync
+WorkingDirectory=/opt/proxsync/frontend
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+ExecStart=/usr/bin/node /opt/proxsync/frontend/server.js
+
+# --- Sandboxing ------------------------------------------------------------
+# The standalone server only reads its own bundle and writes nothing. ProtectSystem=strict
+# with no ReadWritePaths means the entire filesystem is read-only to it.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+UMask=0077
+
+# --- Resources and lifecycle ----------------------------------------------
+MemoryMax=512M
+TasksMax=256
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxsync-web
+
+[Install]
+WantedBy=multi-user.target

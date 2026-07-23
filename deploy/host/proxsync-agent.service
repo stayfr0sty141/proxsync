@@ -1,0 +1,77 @@
+[Unit]
+Description=ProxSync Backup Agent
+Documentation=https://github.com/proxsync/proxsync/blob/main/docs/ARCHITECTURE.md
+After=network-online.target pve-cluster.service
+Wants=network-online.target
+ConditionPathExists=/usr/bin/vzdump
+
+[Service]
+Type=exec
+ExecStart=/opt/proxsync-agent/venv/bin/python -m app
+WorkingDirectory=/opt/proxsync-agent
+EnvironmentFile=/etc/proxsync-agent/agent.env
+
+# --- Privilege -------------------------------------------------------------
+# vzdump, qmrestore and pct restore require root and take dynamic arguments, so a sudoers
+# rule permissive enough to be useful would also be permissive enough to abuse. The request
+# validator in app/validators is the real security boundary; this unit narrows what a
+# compromised agent could reach beyond its intended job.
+User=root
+Group=root
+
+# --- Sandbox ---------------------------------------------------------------
+NoNewPrivileges=yes
+ProtectSystem=true
+# NOT "full" or "strict": qm and pct write guest configuration to /etc/pve, so a read-only
+# /etc breaks every restore. Do not tighten this without testing a restore.
+ProtectHome=yes
+# Remove ProtectHome if your backup storage is mounted under /home.
+ProtectKernelTunables=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=no
+# NOT restricted: pct restore creates mount and user namespaces for containers.
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+# AF_NETLINK is required: LVM and udev use it during snapshot backups.
+PrivateTmp=no
+# NOT private: vzdump stages archives in the configured tmpdir and expects it to be shared.
+PrivateDevices=no
+# NOT private: LVM/ZFS snapshot backups need access to block devices.
+MemoryDenyWriteExecute=no
+# NOT denied: helper processes spawned by vzdump may JIT.
+
+# --- Network reachability --------------------------------------------------
+# Replace 10.0.0.20 with the dashboard LXC address. Defence in depth: the application also
+# enforces PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS.
+IPAddressDeny=any
+IPAddressAllow=localhost
+IPAddressAllow=10.0.0.20/32
+
+# --- Managed directories ---------------------------------------------------
+StateDirectory=proxsync-agent
+StateDirectoryMode=0750
+LogsDirectory=proxsync-agent
+LogsDirectoryMode=0750
+ConfigurationDirectory=proxsync-agent
+ConfigurationDirectoryMode=0750
+
+# --- Resources and lifecycle ----------------------------------------------
+MemoryMax=512M
+TasksMax=256
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+# Default KillMode=control-group: a stop kills vzdump too. The agent marks such tasks
+# "interrupted" on its next start rather than guessing they succeeded.
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxsync-agent
+
+[Install]
+WantedBy=multi-user.target

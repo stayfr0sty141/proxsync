@@ -1,0 +1,80 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" httpx2
+
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check
+        run: mypy app tests
+
+      - name: Test
+        run: pytest -q
+
+      - name: Migration applies to an empty database
+        env:
+          PROXSYNC_SECRET_KEY: ci-only-not-a-real-secret-0123456789
+          PROXSYNC_DATABASE_URL: sqlite+aiosqlite:///./ci-check.db
+        run: alembic upgrade head && alembic downgrade base
+
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: proxsync
+          POSTGRES_PASSWORD: proxsync
+          POSTGRES_DB: proxsync
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,postgres]"
+
+      # The portability claim in docs/DATABASE.md is only true if it is exercised.
+      - name: Migration applies to PostgreSQL
+        env:
+          PROXSYNC_SECRET_KEY: ci-only-not-a-real-secret-0123456789
+          PROXSYNC_DATABASE_URL: postgresql+asyncpg://proxsync:proxsync@localhost:5432/proxsync
+        run: |
+          alembic upgrade head
+          alembic downgrade base

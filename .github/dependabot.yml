@@ -1,0 +1,41 @@
+# Keeps ProxSync's dependencies current across all three components and the CI actions.
+#
+# Grouped updates: a batch of minor/patch bumps arrives as one PR per ecosystem rather than a
+# storm of single-package PRs, which is what makes it realistic to actually review them. Major
+# bumps stay separate, because they are the ones that need a human to read a changelog.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /agent
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      agent-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]

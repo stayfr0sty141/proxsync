@@ -1,0 +1,19 @@
+# Schedules the ProxSync database self-backup once a day.
+#
+# OnCalendar fires at 02:15 local time; Persistent=true means a backup missed because the
+# container was off (a homelab host rebooting overnight) runs at the next boot rather than
+# being skipped until tomorrow. RandomizedDelaySec avoids a thundering herd if several
+# ProxSync-style timers share a host.
+
+[Unit]
+Description=Daily ProxSync database self-backup
+Documentation=https://github.com/ProxSync/ProxSync
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=proxsync-db-backup.service
+
+[Install]
+WantedBy=timers.target

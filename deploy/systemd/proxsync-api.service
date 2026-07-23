@@ -1,0 +1,74 @@
+# ProxSync Dashboard API — runs in the unprivileged LXC.
+#
+# This process holds no host privilege: it binds to 127.0.0.1 (nginx terminates TLS and
+# reverse-proxies /api/*), speaks to the Proxmox host only through the agent over mTLS, and
+# never spawns a shell. The hardening below is deliberately stricter than the agent's, because
+# nothing here needs vzdump's access to devices, namespaces or a shared /tmp.
+#
+# Installed and enabled by deploy/lxc/install.sh. Config lives in /etc/proxsync/api.env.
+
+[Unit]
+Description=ProxSync Dashboard API
+Documentation=https://github.com/ProxSync/ProxSync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=proxsync
+Group=proxsync
+WorkingDirectory=/opt/proxsync/backend
+EnvironmentFile=/etc/proxsync/api.env
+ExecStart=/opt/proxsync/backend/venv/bin/python -m app
+
+# --- Sandboxing ------------------------------------------------------------
+# The dashboard is a pure network service over a database and an HTTPS client. It has no
+# reason to touch the host beyond its own state, so almost everything is denied.
+NoNewPrivileges=yes
+ProtectSystem=strict
+# strict makes the whole filesystem read-only except the paths named below.
+ReadWritePaths=/var/lib/proxsync /var/log/proxsync
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+# NOT denied: CPython's JIT-adjacent allocations and some crypto backends map W|X pages.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+UMask=0077
+
+# --- Managed directories ---------------------------------------------------
+StateDirectory=proxsync
+StateDirectoryMode=0750
+LogsDirectory=proxsync
+LogsDirectoryMode=0750
+ConfigurationDirectory=proxsync
+ConfigurationDirectoryMode=0750
+
+# --- Resources and lifecycle ----------------------------------------------
+MemoryMax=768M
+TasksMax=512
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=proxsync-api
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+# ProxSync dashboard — a grouping target for the two LXC services.
+#
+# `systemctl start proxsync.target` starts the API and the UI together; `stop` stops both.
+# nginx is a system service in its own right and is intentionally not bound here, so the
+# reverse proxy can keep serving its maintenance page while the app is restarted.
+
+[Unit]
+Description=ProxSync dashboard (API + Web UI)
+Documentation=https://github.com/ProxSync/ProxSync
+Wants=proxsync-api.service proxsync-web.service
+After=proxsync-api.service proxsync-web.service
+
+[Install]
+WantedBy=multi-user.target

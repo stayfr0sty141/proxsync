@@ -1,0 +1,25 @@
+# ProxSync self-backup — dumps ProxSync's own database. Triggered by proxsync-db-backup.timer.
+#
+# Type=oneshot: the timer starts it, it runs to completion, and its exit status is recorded.
+# A non-zero exit (a failed or unverified dump) shows up in `systemctl status` and the journal
+# rather than passing silently, because the one backup you never check is the one that failed.
+
+[Unit]
+Description=ProxSync database self-backup
+Documentation=https://github.com/ProxSync/ProxSync
+After=proxsync-api.service
+
+[Service]
+Type=oneshot
+User=proxsync
+Group=proxsync
+EnvironmentFile=/etc/proxsync/api.env
+ExecStart=/opt/proxsync/scripts/proxsync-db-backup.sh --out-dir /var/backups/proxsync --keep 14
+
+# The script only needs to read the database and write the backup directory.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/backups/proxsync /var/lib/proxsync
+ProtectHome=yes
+PrivateTmp=yes
+UMask=0077
