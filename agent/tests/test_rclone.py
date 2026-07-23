@@ -26,7 +26,7 @@ RCLONE = Path("/usr/bin/rclone")
 
 @pytest.fixture
 def options() -> RcloneOptions:
-    return RcloneOptions(rclone_bin=RCLONE, config_path=Path("/root/.config/rclone/rclone.conf"))
+    return RcloneOptions(rclone_bin=RCLONE, config_path=Path("/var/lib/proxsync-agent/rclone.conf"))
 
 
 class TestArgv:
@@ -56,7 +56,7 @@ class TestArgv:
 
     def test_config_path_is_passed_explicitly(self, options: RcloneOptions) -> None:
         argv = build_copy_argv(options, source="/local/a", destination="gdrive:a")
-        assert argv[argv.index("--config") + 1] == "/root/.config/rclone/rclone.conf"
+        assert argv[argv.index("--config") + 1] == "/var/lib/proxsync-agent/rclone.conf"
 
     def test_bandwidth_limit_is_expressed_in_kibibytes(self) -> None:
         options = RcloneOptions(rclone_bin=RCLONE, bwlimit_kbps=2048)

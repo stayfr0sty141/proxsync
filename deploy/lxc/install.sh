@@ -177,9 +177,14 @@ fi
 
 # ---- Database migration ----------------------------------------------------
 log "Applying database migrations"
-( cd "${INSTALL_ROOT}/backend" && \
-  set -a && . "$ENV_FILE" && set +a && \
-  venv/bin/alembic upgrade head )
+(
+  cd "${INSTALL_ROOT}/backend"
+  set -a
+  # shellcheck source=/dev/null
+  . "$ENV_FILE"
+  set +a
+  venv/bin/alembic upgrade head
+)
 chown -R "$SERVICE_USER:$SERVICE_USER" "$STATE_DIR"
 
 # ---- Bootstrap TLS certificate ---------------------------------------------

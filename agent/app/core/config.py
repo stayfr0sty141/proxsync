@@ -89,7 +89,7 @@ class AgentSettings(BaseSettings):
     rclone_bin: Path = Path("/usr/bin/rclone")
 
     # ---- Google Drive sync (decision D1: rclone runs here, not in the LXC) ----
-    rclone_config: Path | None = Path("/root/.config/rclone/rclone.conf")
+    rclone_config: Path | None = Path("/var/lib/proxsync-agent/rclone.conf")
     """Read by rclone as root. The agent never parses it — it holds OAuth tokens, and the
     agent has no reason to see them."""
 
