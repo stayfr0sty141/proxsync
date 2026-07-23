@@ -63,14 +63,14 @@ ip netns exec "$server_ns" nft --file "$rules"
 ip netns exec "$server_ns" timeout 3 nc -l 18765 >/dev/null &
 listener_pid=$!
 sleep 0.1
-printf dashboard | ip netns exec "$dashboard_ns" timeout 2 nc 10.210.1.1 18765
+printf dashboard | ip netns exec "$dashboard_ns" timeout 2 nc -N 10.210.1.1 18765
 wait "$listener_pid"
 
 # Another source is dropped.
 ip netns exec "$server_ns" timeout 3 nc -l 18765 >/dev/null &
 listener_pid=$!
 sleep 0.1
-if printf other | ip netns exec "$other_ns" timeout 1 nc 10.210.2.1 18765; then
+if printf other | ip netns exec "$other_ns" timeout 1 nc -N 10.210.2.1 18765; then
     echo "FAIL: unapproved source reached the agent port" >&2
     exit 1
 fi
@@ -80,7 +80,7 @@ wait "$listener_pid" || true
 ip netns exec "$dashboard_ns" timeout 3 nc -l 18766 >/dev/null &
 listener_pid=$!
 sleep 0.1
-printf outbound | ip netns exec "$server_ns" timeout 2 nc 10.210.1.2 18766
+printf outbound | ip netns exec "$server_ns" timeout 2 nc -N 10.210.1.2 18766
 wait "$listener_pid"
 
 echo "PASS: dashboard accepted, other source dropped, outbound connection allowed"
