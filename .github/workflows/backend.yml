@@ -51,7 +51,7 @@ jobs:
         image: postgres:17
         env:
           POSTGRES_USER: proxsync
-          POSTGRES_PASSWORD: proxsync
+          POSTGRES_PASSWORD: ${{ secrets.CI_PG_PASSWORD }}
           POSTGRES_DB: proxsync
         options: >-
           --health-cmd pg_isready --health-interval 10s
@@ -74,7 +74,7 @@ jobs:
       - name: Migration applies to PostgreSQL
         env:
           PROXSYNC_SECRET_KEY: ci-only-not-a-real-secret-0123456789
-          PROXSYNC_DATABASE_URL: postgresql+asyncpg://proxsync:proxsync@localhost:5432/proxsync
+          PROXSYNC_DATABASE_URL: postgresql+asyncpg://proxsync:${{ secrets.CI_PG_PASSWORD }}@localhost:5432/proxsync
         run: |
           alembic upgrade head
           alembic downgrade base
