@@ -20,7 +20,7 @@ Install the **agent first** — it prints the credentials the dashboard needs.
 
 - Proxmox VE 8 (Debian 12) or 9 (Debian 13)
 - A mounted backup storage (e.g. `backup-hdd`) and its dump directory
-- `openssl`, `python3` ≥ 3.11 (both ship with PVE)
+- `openssl`, `nftables`, `python3` ≥ 3.11 (all available on PVE)
 - `rclone` configured with your Google Drive remote, if you want off-site sync (see §5)
 
 ### In the LXC container (Debian 12/13, unprivileged)
@@ -42,20 +42,62 @@ apt install -y python3 python3-venv nodejs npm nginx sqlite3 openssl
 
 ```bash
 cd ProxSync/deploy/host
-./install-agent.sh --dashboard-ip 10.0.0.20 --dump-root /mnt/backup-hdd/dump
+./install-agent.sh \
+  --dashboard-ip 10.0.0.20 \
+  --dump-root /mnt/backup-hdd/dump \
+  --rclone-config /root/.config/rclone/rclone.conf \
+  --rclone-remote gdrive
 ```
 
 `--dashboard-ip` is the address of the LXC container that will run the dashboard; the agent
-refuses connections from anywhere else, at both the firewall (systemd `IPAddressAllow`) and the
-application layer.
+refuses connections from anywhere else at both the managed nftables firewall and application
+layers. The installer never prints the HMAC secret; retrieve it locally as root only when
+provisioning the dashboard:
 
-When it finishes it prints three things you need next:
+```bash
+sed -n 's/^PROXSYNC_AGENT_HMAC_SECRET=//p' /etc/proxsync-agent/agent.env
+```
 
-- the **agent URL** (`https://<host-ip>:8765`),
-- the **HMAC secret**, and
-- three certificate files to copy to the dashboard: `ca.crt`, `dashboard.crt`, `dashboard.key`.
+It reports the agent URL and the three certificate files to copy to the dashboard:
+`ca.crt`, `dashboard.crt`, and `dashboard.key`.
 
-Leave that output on screen.
+### Firewall lifecycle
+
+The default `--configure-firewall` mode owns only `table inet proxsync`. It writes
+`/etc/nftables.d/proxsync.nft` and enables `proxsync-firewall.service`, whose loader replaces
+that table in one checked nftables transaction before `proxsync-agent.service` starts. It does
+not flush the global ruleset, hook outbound traffic, enable the global nftables service, or
+modify Proxmox Firewall, iptables-compatibility rules, user tables, or other service ports.
+
+- `--configure-firewall` creates or deterministically updates runtime and boot-persistent rules.
+- `--skip-firewall` changes nothing. Existing ProxSync rules remain active and the installer
+  warns about them.
+- `--remove-firewall` removes only the ProxSync table, fragment, loader, and unit.
+
+Native nftables, Proxmox Firewall, and iptables compatibility may coexist, but their independent
+input chains can still reject a connection before or after ProxSync's chain. Do not create a
+second `table inet proxsync`; that name is reserved for this installer.
+
+### Safe reruns, PKI repair, and rollback
+
+Every rerun stages and validates its environment, systemd units, nftables transaction, and PKI
+before mutation. It backs up the previous application, configuration, units, certificates, and
+runtime firewall. A failed apply, restart, mTLS health check, certificate check, or firewall
+reload restores those files and rules and restarts the previous service.
+
+The desired server SAN set is exactly the agent DNS name, agent IP, `127.0.0.1`, and `::1`.
+Changing either DNS or IP rotates only the server leaf certificate. A missing server or
+dashboard key is repaired with the existing CA. If `ca.crt` exists but `ca.key` is unavailable,
+valid existing leaves may be reused, but any required repair or rotation stops with an error.
+Use `--repair-pki` to explicitly audit partial state, `--rotate-server-cert` for a leaf-only
+rotation, and `--regenerate-all-secrets` only for an intentional trust reset; the latter
+replaces the CA, dashboard credentials, and HMAC secret.
+
+`--rclone-config` is an import source. The installer validates it, copies it with mode `0600`
+into `/var/lib/proxsync-agent/rclone.conf`, and points the service at that managed copy. This is
+required because the hardened unit hides `/root`; the state directory remains writable when
+rclone refreshes an OAuth token. A rerun stages the current managed copy first, so token updates
+are preserved and a failed install restores the prior copy.
 
 ---
 
@@ -108,7 +150,7 @@ chmod 0640 /etc/proxsync/agent-client.key
 Edit `/etc/proxsync/api.env` and set:
 
 ```ini
-PROXSYNC_AGENT_HMAC_SECRET=<the HMAC secret the agent printed>
+PROXSYNC_AGENT_HMAC_SECRET=<the HMAC secret read locally from the agent env file>
 PROXSYNC_PROXMOX_TOKEN_ID=proxsync@pve!dashboard
 PROXSYNC_PROXMOX_TOKEN_SECRET=<the token secret>
 ```
@@ -174,7 +216,8 @@ rclone config
 | `y/e/d>` | `y` (yes, keep the remote) |
 | `e/n/d/r/c/s/q>` | `q` (quit) |
 
-After completing the OAuth flow in your browser, verify the remote works:
+After completing the OAuth flow in your browser, verify the remote works without printing its
+configuration or token:
 
 ```bash
 rclone about gdrive:
@@ -183,6 +226,18 @@ rclone about gdrive:
 rclone ls gdrive:
 # Lists files at the root of your Drive (may be empty)
 ```
+
+For an installer-gated authenticated check, use:
+
+```bash
+./install-agent.sh --dashboard-ip 10.0.0.20 --rclone-remote gdrive \
+  --require-rclone --require-drive-connectivity
+```
+
+Despite the compatibility option name, the check is backend-neutral: it verifies the named
+entry from `rclone listremotes` with a bounded `rclone lsd remote:` call. Raw DNS/TCP reachability
+is not treated as proof that OAuth credentials, backend permissions, or the remote work. Command
+output is suppressed and failures are reported without config, token, or provider response text.
 
 > **Troubleshooting**: If the host is headless (no desktop), choose `n` at the browser
 > prompt. rclone prints a URL — open it on your laptop, sign in to Google, copy the

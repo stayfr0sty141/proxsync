@@ -36,10 +36,10 @@ been applied (after a manual code update) shows as a schema error — run
 The dashboard talks to the agent over mutual TLS **and** an HMAC signature; either failing
 shows the agent as unreachable. Work through:
 
-1. **Network / firewall.** From the container: `curl -k https://<host-ip>:8765/health`. If this
-   hangs, the agent's `IPAddressAllow` or `ALLOWED_CLIENT_NETWORKS` does not include the
-   container's address. Fix the address in `/etc/proxsync-agent/agent.env` (and the systemd
-   unit's `IPAddressAllow`) and `systemctl restart proxsync-agent`.
+1. **Network / firewall.** Check `systemctl status proxsync-firewall.service` and
+   `nft list table inet proxsync`, then test from the container. If its address changed, rerun
+   `install-agent.sh --dashboard-ip <new-address>`; do not hand-edit only `agent.env`, because
+   the application allow-list and managed nftables rule must change together.
 2. **Client certificate.** The three files must be present in the container and referenced by
    `PROXSYNC_AGENT_CA_CERT` / `_CLIENT_CERT` / `_CLIENT_KEY`, with the key readable by the
    `proxsync` user (mode 0640, group `proxsync`).

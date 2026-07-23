@@ -6,6 +6,18 @@ All notable changes to ProxSync are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Repaired the frontend npm lockfile and patched vulnerable transitive PostCSS/Sharp versions.
+- Pinned maintained GitHub Actions releases and made Python dependency audits resolve local
+  project metadata without treating private editable packages as missing from PyPI.
+- Made the host installer validate options before mutation, compare complete TLS SAN sets,
+  recover partial PKI safely, verify real rclone remotes without logging credentials, and
+  restore the previous service/configuration/PKI/firewall state after a failed installation.
+- Replaced the reboot-volatile firewall apply with an idempotent, transactional, boot-persistent
+  loader that owns only `table inet proxsync`; added explicit unchanged/removal modes and
+  namespace integration coverage.
+
 ## [0.1.0] — 2026-07-23
 
 The first tagged release. Every component is code-complete and tested against fakes that

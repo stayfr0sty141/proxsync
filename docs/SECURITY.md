@@ -101,9 +101,12 @@ deliberately *looser* in a few specific, commented places — it keeps `Restrict
 (pct restore creates namespaces), a shared `/tmp` and device access (vzdump snapshots need
 them). The dashboard unit has no such exceptions because it needs none.
 
-The agent unit also pins network reachability at the kernel: `IPAddressDeny=any` with an
-`IPAddressAllow` for localhost and the dashboard address only, which is defence in depth behind
-the application's own `ALLOWED_CLIENT_NETWORKS` check.
+The agent's dedicated `table inet proxsync` accepts loopback and the configured dashboard source
+to the agent port, then drops other sources to that port. Its persistent loader replaces only
+that table in a syntax-checked transaction and never flushes the global ruleset. It has no
+output hook, so rclone egress remains unaffected. This is defence in depth behind the
+application's own `ALLOWED_CLIENT_NETWORKS` check and coexists with independently managed
+Proxmox Firewall, native nftables, and iptables-compatibility chains.
 
 ---
 

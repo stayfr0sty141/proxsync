@@ -73,9 +73,12 @@ cd ProxSync/deploy/host
 ```
 
 - [ ] Installer finished without error
-- [ ] **Copied down its output:** the **HMAC secret** and the paths to `ca.crt`,
-      `dashboard.crt`, `dashboard.key`
+- [ ] Read the HMAC secret locally from `/etc/proxsync-agent/agent.env` as root; it is not
+      printed by the installer
+- [ ] Copied `ca.crt`, `dashboard.crt`, and `dashboard.key` to the dashboard
 - **Verify:** `systemctl is-active proxsync-agent` → `active`
+- **Verify:** `systemctl is-enabled proxsync-firewall.service` → `enabled`
+- **Verify:** `nft list table inet proxsync` names only the intended dashboard IP and agent port
 - **Verify:** `curl --cacert /etc/proxsync-agent/tls/ca.crt https://<HOST_IP>:8765/health`
       returns a health JSON
 
@@ -138,7 +141,7 @@ chmod 0640 /etc/proxsync/agent-client.key
 Edit `/etc/proxsync/api.env` and set:
 
 ```ini
-PROXSYNC_AGENT_HMAC_SECRET=<HMAC secret the agent printed>
+PROXSYNC_AGENT_HMAC_SECRET=<HMAC secret read as root from the agent env file>
 PROXSYNC_PROXMOX_TOKEN_ID=proxsync@pve!dashboard
 PROXSYNC_PROXMOX_TOKEN_SECRET=<token secret>
 ```
@@ -216,7 +219,7 @@ journalctl -u proxsync-agent -f                    # on the host
 
 Most first-install failures are one of:
 
-- **`agent` not `ok`** → firewall/`IPAddressAllow`, client cert path/perms, HMAC mismatch, or
+- **`agent` not `ok`** → managed firewall/application allow-list, client cert path/perms, HMAC mismatch, or
   clock skew between host and LXC (see TROUBLESHOOTING.md).
 - **API won't start** → a missing/invalid value in `/etc/proxsync/api.env`
   (`PROXSYNC_SECRET_KEY` too short, wrong `DATABASE_URL` driver).

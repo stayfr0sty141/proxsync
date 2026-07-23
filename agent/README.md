@@ -8,7 +8,7 @@ generic command endpoint.
 
 | Layer | Control |
 | --- | --- |
-| Address | `PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS` — checked before authentication, on every route including `/health`. Mirrored by `IPAddressAllow=` in the systemd unit |
+| Address | `PROXSYNC_AGENT_ALLOWED_CLIENT_NETWORKS` — checked before authentication, on every route including `/health`. Mirrored by the dedicated `table inet proxsync` input chain |
 | Transport | Mutual TLS. uvicorn runs with `ssl_cert_reqs=CERT_REQUIRED` against the dashboard CA, so a handshake without a valid client certificate never reaches the application |
 | Request | HMAC-SHA256 over `METHOD\|path?query\|timestamp\|nonce\|sha256(body)`. ±60 s window, single-use nonces, constant-time comparison |
 | Arguments | Closed enums, VMID allow-list checked against real guest configs, storage checked against `pvesm status`, filenames matched against the vzdump pattern, paths canonicalised and containment-checked after symlink resolution |
@@ -59,9 +59,11 @@ cd proxsync/deploy/host
 ```
 
 The script builds the PKI, writes `/etc/proxsync-agent/agent.env`, creates a virtualenv in
-`/opt/proxsync-agent`, installs the hardened systemd unit, and prints the HMAC secret plus
-the three files the dashboard needs. Re-running preserves existing secrets unless
-`--regenerate-secrets` is passed.
+`/opt/proxsync-agent`, installs the hardened systemd unit and persistent
+`table inet proxsync`, and reports the three files the dashboard needs. It does not print the
+HMAC secret. Re-running preserves the CA, dashboard credentials, and HMAC secret; DNS/IP SAN
+changes rotate only the server leaf. `--regenerate-all-secrets` is the explicit trust-reset
+operation.
 
 Configuration reference: [.env.example](.env.example).
 
