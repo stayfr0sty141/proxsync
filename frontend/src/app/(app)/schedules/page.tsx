@@ -100,21 +100,35 @@ export default function SchedulesPage() {
 
       {/* Create schedule modal */}
       {showCreate && (
+        // Backdrop — presentational, click-to-close is handled by the inner dialog
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
+          role="presentation"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowCreate(false);
           }}
         >
-          <div className="w-full max-w-lg rounded-xl border border-border-muted bg-surface shadow-2xl">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-schedule-title"
+            className="w-full max-w-lg rounded-xl border border-border-muted bg-surface shadow-2xl"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowCreate(false);
+            }}
+          >
             <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-              <h2 className="text-base font-semibold text-fg-default">
+              <h2
+                id="create-schedule-title"
+                className="text-base font-semibold text-fg-default"
+              >
                 New Schedule
               </h2>
               <button
                 onClick={() => setShowCreate(false)}
                 className="text-lg text-fg-muted transition-colors hover:text-fg-default"
-                aria-label="Close"
+                aria-label="Close dialog"
               >
                 ✕
               </button>

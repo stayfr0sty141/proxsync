@@ -110,10 +110,11 @@ export function CreateScheduleDialog({
     <div className="flex flex-col gap-5">
       {/* Name */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-fg-muted">
+        <label htmlFor="sched-name" className="text-xs font-medium text-fg-muted">
           Name <span className="text-accent">*</span>
         </label>
         <Input
+          id="sched-name"
           placeholder="e.g. Nightly all VMs"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -177,7 +178,7 @@ export function CreateScheduleDialog({
                   : "bg-elevated text-fg-muted hover:text-fg-default"
               }`}
             >
-              {s === "all" ? "All guests" : s === "include" ? "Include" : "Exclude"}
+              {s === "all" ? "All guests" : s}
             </button>
           ))}
         </div>
@@ -234,24 +235,30 @@ export function CreateScheduleDialog({
 
       {/* Toggles */}
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-sm text-fg-default">
+        <div className="flex items-center gap-2">
           <input
+            id="sched-upload"
             type="checkbox"
             checked={upload}
             onChange={(e) => setUpload(e.target.checked)}
             className="size-4 accent-accent"
           />
-          Upload to Google Drive after backup
-        </label>
-        <label className="flex items-center gap-2 text-sm text-fg-default">
+          <label htmlFor="sched-upload" className="text-sm text-fg-default">
+            Upload to Google Drive after backup
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
           <input
+            id="sched-enabled"
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
             className="size-4 accent-accent"
           />
-          Enable schedule immediately
-        </label>
+          <label htmlFor="sched-enabled" className="text-sm text-fg-default">
+            Enable schedule immediately
+          </label>
+        </div>
       </div>
 
       {/* Actions */}
