@@ -317,9 +317,29 @@ class SyncService:
 
     async def compare(self) -> ComparisonResponse:
         """Local versus remote, by filename and size."""
-        config = await self._require_enabled()
+        config = await self.config()
 
         local = {entry.filename: entry for entry in await self.local_entries()}
+
+        if not config.enabled:
+            disabled_states = [
+                self._compare_one(filename, entry, None)
+                for filename, entry in sorted(local.items())
+            ]
+            return ComparisonResponse(
+                remote=config.remote_name or "gdrive",
+                remote_path=config.folder or "dump",
+                in_sync=0,
+                local_only=len(disabled_states),
+                remote_only=0,
+                size_mismatch=0,
+                entries=disabled_states,
+                detail=(
+                    "Google Drive sync is disabled. Enable it under Settings → Google Drive "
+                    "to enable cloud sync."
+                ),
+            )
+
         try:
             remote = {entry.filename: entry for entry in await self.remote_entries()}
         except (AgentUnavailable, AgentError) as exc:
