@@ -376,15 +376,18 @@ class SyncService:
         try:
             remote = {entry.filename: entry for entry in await self.remote_entries()}
         except (AgentUnavailable, AgentError) as exc:
-            # A partial answer must never read as "everything is in sync".
+            local_error_states = [
+                self._compare_one(filename, entry, None)
+                for filename, entry in sorted(local.items())
+            ]
             return ComparisonResponse(
                 remote=config.remote_name,
                 remote_path=config.folder,
                 in_sync=0,
-                local_only=0,
+                local_only=len(local_error_states),
                 remote_only=0,
                 size_mismatch=0,
-                entries=[],
+                entries=local_error_states,
                 detail=f"The remote could not be listed: {exc.detail}",
             )
 

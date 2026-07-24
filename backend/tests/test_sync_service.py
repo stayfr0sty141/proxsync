@@ -113,8 +113,9 @@ class TestQueueing:
         backup_id = await seed_backup(session_factory)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session, agent).enqueue_upload(backup_id)
+                await service.enqueue_upload(backup_id)
 
         assert "disabled" in excinfo.value.detail
 
@@ -125,8 +126,9 @@ class TestQueueing:
         backup_id = await seed_backup(session_factory, status=BackupStatus.FAILED, filename=None)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(ValidationFailed):
-                await build_service(session, agent).enqueue_upload(backup_id)
+                await service.enqueue_upload(backup_id)
 
     async def test_refuses_a_locally_deleted_artifact(
         self, session_factory: async_sessionmaker[AsyncSession], agent: AgentClient
@@ -135,8 +137,9 @@ class TestQueueing:
         backup_id = await seed_backup(session_factory, deleted=True)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session, agent).enqueue_upload(backup_id)
+                await service.enqueue_upload(backup_id)
 
         assert "nothing left to send" in excinfo.value.detail
 
@@ -151,8 +154,9 @@ class TestQueueing:
             await session.commit()
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(Conflict) as excinfo:
-                await build_service(session, agent).enqueue_upload(backup_id)
+                await service.enqueue_upload(backup_id)
 
         assert "already queued" in excinfo.value.detail
 
@@ -163,8 +167,9 @@ class TestQueueing:
         backup_id = await seed_backup(session_factory, upload_status=UploadStatus.UPLOADED)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(Conflict):
-                await build_service(session, agent).enqueue_upload(backup_id)
+                await service.enqueue_upload(backup_id)
 
         async with session_factory() as session:
             task = await build_service(session, agent).enqueue_upload(backup_id, force=True)
@@ -437,8 +442,11 @@ class TestComparison:
         async with session_factory() as session:
             result = await build_service(session, agent).compare()
 
-        assert result.entries == []
+        assert len(result.entries) == 1
+        assert result.entries[0].filename == "a.vma.zst"
+        assert result.entries[0].state == "local_only"
         assert result.in_sync == 0
+        assert result.local_only == 1
         assert result.detail is not None
         assert "could not be listed" in result.detail
 
