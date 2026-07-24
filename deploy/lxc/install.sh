@@ -110,11 +110,13 @@ elif [[ -d "${REPO_ROOT}/frontend/node_modules" ]]; then
     cp -a "${REPO_ROOT}/frontend/node_modules" "${INSTALL_ROOT}/frontend/"
 fi
 
-STANDALONE_DIR="$(find "${REPO_ROOT}/frontend/.next/standalone" -name "server.js" -exec dirname {} \; | head -n 1)"
-if [[ -n "$STANDALONE_DIR" && -d "$STANDALONE_DIR" ]]; then
-    cp -a "${STANDALONE_DIR}/." "${INSTALL_ROOT}/frontend/"
+# Copy the standalone build. The root server.js is the Next.js entrypoint; avoid matching
+# the identically-named files buried inside node_modules (e.g. next/dist/server/typescript/…).
+STANDALONE_ROOT="${REPO_ROOT}/frontend/.next/standalone"
+if [[ -f "${STANDALONE_ROOT}/server.js" ]]; then
+    cp -a "${STANDALONE_ROOT}/." "${INSTALL_ROOT}/frontend/"
 else
-    cp -a "${REPO_ROOT}/frontend/.next/standalone/." "${INSTALL_ROOT}/frontend/"
+    die "Standalone server.js not found in ${STANDALONE_ROOT}. Did 'next build' succeed with output: 'standalone'?"
 fi
 
 install -d "${INSTALL_ROOT}/frontend/.next"
