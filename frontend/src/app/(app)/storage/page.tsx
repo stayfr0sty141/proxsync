@@ -71,8 +71,8 @@ export default function StoragePage() {
                   />
                   {d.storages.map((pool) => (
                     <UsageBar
-                      key={pool.storage}
-                      label={pool.storage}
+                      key={pool.name}
+                      label={`${pool.name} (${pool.type})`}
                       usedBytes={pool.used_bytes}
                       totalBytes={pool.total_bytes}
                     />
