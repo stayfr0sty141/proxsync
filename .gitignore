@@ -35,6 +35,7 @@ secrets/
 !deploy/**/*.example.pem
 data/
 logs/
+!frontend/src/app/**/logs/
 *.log
 
 # ---- OS / editor --------------------------------------------------------
