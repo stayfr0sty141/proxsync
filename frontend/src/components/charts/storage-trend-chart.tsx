@@ -58,7 +58,7 @@ export function StorageTrendChart({
             labelFormatter={(ts) =>
               new Date(ts as number).toISOString().slice(0, 16).replace("T", " ")
             }
-            formatter={(value: number) => [formatBytes(value), "Used"]}
+            formatter={(value) => [formatBytes(typeof value === "number" ? value : 0), "Used"]}
           />
           <Area
             type="monotone"
