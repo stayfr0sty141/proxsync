@@ -1166,7 +1166,15 @@ install_agent() {
     hmac_secret="$old_hmac"
     [[ -n "$hmac_secret" ]] || hmac_secret="$(openssl rand -hex 32)"
     dashboard_cidr="$(get_cidr "$DASHBOARD_IP")"
-    render_environment "$staged_env" "$hmac_secret" "$dashboard_cidr"
+    agent_cidr="$(get_cidr "$AGENT_IP")"
+    allowed_networks="$dashboard_cidr"
+    if [[ "$allowed_networks" != *"$agent_cidr"* ]]; then
+        allowed_networks="${allowed_networks},${agent_cidr}"
+    fi
+    if [[ "$allowed_networks" != *"127.0.0.1/32"* ]]; then
+        allowed_networks="${allowed_networks},127.0.0.1/32"
+    fi
+    render_environment "$staged_env" "$hmac_secret" "$allowed_networks"
 
     sed -e "s|MemoryHigh=.*|MemoryHigh=${MEMORY_HIGH}|" \
         -e "s|MemoryMax=.*|MemoryMax=${MEMORY_MAX}|" \
