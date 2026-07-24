@@ -112,7 +112,7 @@ export default function SchedulesPage() {
           <dialog
             open
             aria-labelledby="create-schedule-title"
-            className="fixed left-1/2 top-1/2 z-50 m-0 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-muted bg-surface p-0 shadow-2xl"
+            className="fixed left-1/2 top-1/2 z-50 m-0 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-muted bg-surface p-0 text-fg-default shadow-2xl"
             onKeyDown={(e) => {
               if (e.key === "Escape") setShowCreate(false);
             }}
