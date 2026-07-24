@@ -1084,12 +1084,22 @@ verify_installation() {
         "${TLS_DIR}/dashboard.key" <<'PY' >/dev/null
 import ssl
 import sys
+import time
 import urllib.request
-context = ssl.create_default_context(cafile=sys.argv[2])
-context.load_cert_chain(certfile=sys.argv[3], keyfile=sys.argv[4])
-with urllib.request.urlopen(sys.argv[1], context=context, timeout=8) as response:
-    if response.status != 200:
-        raise SystemExit(1)
+
+url, cafile, certfile, keyfile = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+context = ssl.create_default_context(cafile=cafile)
+context.load_cert_chain(certfile=certfile, keyfile=keyfile)
+
+for _ in range(15):
+    try:
+        with urllib.request.urlopen(url, context=context, timeout=3) as response:
+            if response.status == 200:
+                sys.exit(0)
+    except Exception:
+        time.sleep(1)
+
+sys.exit(1)
 PY
     then
         die "mTLS health endpoint '${health_url}' did not return HTTP 200."
