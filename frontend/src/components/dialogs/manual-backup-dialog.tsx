@@ -194,6 +194,7 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
           return (
             <label
               key={`${g.guest_type}-${g.vmid}`}
+              aria-label={`Select ${g.name} (${g.vmid})`}
               className={cn(
                 "flex cursor-pointer items-center gap-3 border-b border-border-muted px-3 py-2 text-xs last:border-0 hover:bg-elevated transition-colors",
                 isChecked && "bg-elevated/60",
@@ -203,6 +204,7 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
                 type="checkbox"
                 checked={isChecked}
                 onChange={() => toggle(g.vmid)}
+                aria-label={`Select ${g.name} (${g.vmid})`}
                 className="size-4 accent-accent"
               />
               <div className="flex flex-1 items-center gap-2">

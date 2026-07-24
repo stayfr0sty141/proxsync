@@ -98,7 +98,9 @@ export default function BackupsPage() {
         isError={query.isError}
         error={query.error}
         data={query.data}
-        onRetry={() => void query.refetch()}
+        onRetry={() => {
+          query.refetch();
+        }}
         isEmpty={(d) => d.items.length === 0}
         emptyTitle="No backups found"
         emptyDescription="No backup matches these filters yet."
