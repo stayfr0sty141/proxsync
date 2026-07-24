@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.enums import BackupMode, Compression, SettingsSection
 
-SECRET_UNCHANGED = "__unchanged__"  # noqa: S105 - a sentinel, not a credential
+SECRET_UNCHANGED = "__unchanged__"  # noqa: S105
 """Sent back by the UI to mean "keep the stored secret". Never a real value."""
 
 
@@ -161,7 +161,7 @@ class ProxmoxSettings(SectionModel):
     The API token lives in the environment and must hold `PVEAuditor` and nothing more.
     """
 
-    node: str = ""
+    node: str = "pve"
     inventory_refresh_seconds: Annotated[int, Field(ge=30, le=86400)] = 300
     auto_enable_new_guests: bool = False
     """When false, a guest discovered on the host is *not* backed up until an admin enables
