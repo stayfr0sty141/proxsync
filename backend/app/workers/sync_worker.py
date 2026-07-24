@@ -208,10 +208,10 @@ class SyncWorker:
                 verify_after=config.verify_after_upload,
             )
         except (AgentUnavailable, AgentError) as exc:
-            await self._record_failure(task_id, str(exc.detail))
+            await self._record_failure(task_id, exc.detail)
             return
         except AppError as exc:
-            await self._record_failure(task_id, str(exc.detail))
+            await self._record_failure(task_id, exc.detail)
             return
 
         await self._attach_agent_task(task_id, accepted.task_id)
@@ -302,6 +302,7 @@ class SyncWorker:
             task.bytes_transferred = progress.bytes_done or task.bytes_transferred
             task.bytes_total = progress.bytes_total or task.bytes_total
             task.transfer_rate_bps = progress.rate_bps
+            await session.commit()
 
         self._events.publish(
             EVENT_SYNC_PROGRESS,
@@ -331,7 +332,7 @@ class SyncWorker:
             task.error_message = None
             result = agent_task.result
             if isinstance(result.get("bytes_transferred"), int):
-                task.bytes_transferred = int(result["bytes_transferred"])
+                task.bytes_transferred = result["bytes_transferred"]
 
             record = (
                 await SqlAlchemyBackupHistoryRepository(session).get(task.backup_id)

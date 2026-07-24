@@ -141,24 +141,44 @@ export default function SyncPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {d.items.map((t: SyncTaskResponse) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="capitalize">{t.operation}</TableCell>
-                      <TableCell>
-                        <StatusBadge domain="sync" status={t.status} />
-                      </TableCell>
-                      <TableCell>
-                        <ByteSize bytes={t.bytes_total} />
-                      </TableCell>
-                      <TableCell className="text-xs text-fg-muted">
-                        {t.attempt}/{t.max_attempts}
-                      </TableCell>
-                      <TableCell>
-                        <RelativeTime
-                          iso={t.finished_at ?? t.created_at}
-                          className="text-xs text-fg-muted"
-                        />
-                      </TableCell>
+                  {d.items.map((t: SyncTaskResponse) => {
+                    const opName = t.operation || (t as unknown as Record<string, string>).direction || "upload";
+                    const sizeBytes = t.bytes_total ?? t.bytes_done;
+
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="capitalize font-medium text-fg-default">{opName}</span>
+                            {t.filename && (
+                              <span className="font-mono text-xs text-fg-muted truncate max-w-[280px]">
+                                {t.filename}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge domain="sync" status={t.status} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <ByteSize bytes={sizeBytes} />
+                            {t.percent !== null && t.percent !== undefined && (
+                              <span className="text-xs text-brand font-mono font-medium">
+                                {t.percent}%
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-fg-muted">
+                          {t.attempt}/{t.max_attempts}
+                        </TableCell>
+                        <TableCell>
+                          <RelativeTime
+                            iso={t.finished_at ?? t.created_at}
+                            className="text-xs text-fg-muted"
+                          />
+                        </TableCell>
                       <TableCell>
                         {t.status === "failed" && (
                           <Button variant="ghost" size="sm" onClick={() => handleRetry(t.id)}>
@@ -172,7 +192,8 @@ export default function SyncPage() {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}

@@ -33,6 +33,21 @@ class SyncTaskResponse(BaseModel):
     error_message: str | None
     created_at: datetime
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def operation(self) -> str:
+        return self.direction.value
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def bytes_done(self) -> int:
+        return self.bytes_transferred
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def rate_bps(self) -> int | None:
+        return self.transfer_rate_bps
+
 
 class SyncTaskListResponse(BaseModel):
     items: list[SyncTaskResponse]
