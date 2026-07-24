@@ -36,7 +36,7 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
   const storageStatus = useStorageStatus();
 
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [filterType, setFilterType] = useState<"all" | "qemu" | "lxc">("all");
+  const [filterType, setFilterType] = useState<"all" | "vm" | "lxc">("all");
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<BackupMode>("snapshot");
   const [compression, setCompression] = useState<Compression>("zstd");
@@ -49,8 +49,11 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
     [queryDomains.runs, queryDomains.backups],
   );
 
-  const storagePools = storageStatus.data?.storages.filter((s) => s.active) ?? [];
-  const allItems = guests.data?.items ?? [];
+  const storagePools = useMemo(
+    () => storageStatus.data?.storages.filter((s) => s.active) ?? [],
+    [storageStatus.data?.storages],
+  );
+  const allItems = useMemo(() => guests.data?.items ?? [], [guests.data?.items]);
 
   const filteredItems = useMemo(() => {
     return allItems.filter((g) => {
@@ -156,13 +159,13 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
               type="button"
               className={cn(
                 "rounded px-2.5 py-1 font-medium transition-colors",
-                filterType === "qemu"
+                filterType === "vm"
                   ? "bg-surface text-fg-default shadow-sm"
                   : "text-fg-muted hover:text-fg-default",
               )}
-              onClick={() => setFilterType("qemu")}
+              onClick={() => setFilterType("vm")}
             >
-              VMs ({allItems.filter((g) => g.guest_type === "qemu").length})
+              VMs ({allItems.filter((g) => g.guest_type === "vm").length})
             </button>
             <button
               type="button"
@@ -178,7 +181,7 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
             </button>
           </div>
 
-          <Button type="button" variant="secondary" size="xs" onClick={toggleAllFiltered}>
+          <Button type="button" variant="secondary" size="sm" onClick={toggleAllFiltered}>
             {allFilteredSelected ? "Deselect All" : "Select All"}
           </Button>
         </div>
@@ -210,10 +213,10 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
                 <span
                   className={cn(
                     "rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase",
-                    g.guest_type === "qemu" ? "bg-accent/15 text-accent" : "bg-info/15 text-info",
+                    g.guest_type === "vm" ? "bg-accent/15 text-accent" : "bg-info/15 text-info",
                   )}
                 >
-                  {g.guest_type === "qemu" ? "VM" : "LXC"}
+                  {g.guest_type === "vm" ? "VM" : "LXC"}
                 </span>
                 <span
                   className={cn(
