@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.schemas.enums import GuestType, SyncDirection, SyncStatus, UploadStatus, VerifyOutcome
 
@@ -112,6 +112,21 @@ class ComparisonState(BaseModel):
     remote_size_bytes: int | None = None
     backup_id: int | None = None
     upload_status: UploadStatus | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def name(self) -> str:
+        return self.filename
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def local_size(self) -> int | None:
+        return self.local_size_bytes
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def remote_size(self) -> int | None:
+        return self.remote_size_bytes
 
 
 class ComparisonResponse(BaseModel):

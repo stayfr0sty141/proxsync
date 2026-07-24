@@ -70,20 +70,30 @@ export default function BrowserPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {d.entries.map((entry: ComparisonEntry) => (
-                <TableRow key={entry.name}>
-                  <TableCell>
-                    <StatusBadge domain="syncState" status={entry.state} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{entry.name}</TableCell>
-                  <TableCell>
-                    <ByteSize bytes={entry.local_size} />
-                  </TableCell>
-                  <TableCell>
-                    <ByteSize bytes={entry.remote_size} />
-                  </TableCell>
-                </TableRow>
-              ))}
+              {d.entries.map((entry: ComparisonEntry) => {
+                const name = entry.name || (entry as unknown as Record<string, string>).filename;
+                const localSize =
+                  entry.local_size ??
+                  (entry as unknown as Record<string, number | null>).local_size_bytes;
+                const remoteSize =
+                  entry.remote_size ??
+                  (entry as unknown as Record<string, number | null>).remote_size_bytes;
+
+                return (
+                  <TableRow key={name}>
+                    <TableCell>
+                      <StatusBadge domain="syncState" status={entry.state} />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{name}</TableCell>
+                    <TableCell>
+                      <ByteSize bytes={localSize} />
+                    </TableCell>
+                    <TableCell>
+                      <ByteSize bytes={remoteSize} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
