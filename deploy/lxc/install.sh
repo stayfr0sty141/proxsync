@@ -103,8 +103,10 @@ log "Building the frontend (this takes a minute)"
 log "Installing the standalone frontend into ${INSTALL_ROOT}/frontend"
 rm -rf "${INSTALL_ROOT}/frontend"
 install -d "${INSTALL_ROOT}/frontend"
-if [[ -d "${REPO_ROOT}/frontend/.next/standalone/frontend" ]]; then
-    cp -a "${REPO_ROOT}/frontend/.next/standalone/frontend/." "${INSTALL_ROOT}/frontend/"
+
+STANDALONE_DIR="$(find "${REPO_ROOT}/frontend/.next/standalone" -name "server.js" -exec dirname {} \; | head -n 1)"
+if [[ -n "$STANDALONE_DIR" && -d "$STANDALONE_DIR" ]]; then
+    cp -a "${STANDALONE_DIR}/." "${INSTALL_ROOT}/frontend/"
     [[ -d "${REPO_ROOT}/frontend/.next/standalone/node_modules" ]] && cp -a "${REPO_ROOT}/frontend/.next/standalone/node_modules" "${INSTALL_ROOT}/frontend/"
 else
     cp -a "${REPO_ROOT}/frontend/.next/standalone/." "${INSTALL_ROOT}/frontend/"
