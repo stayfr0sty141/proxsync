@@ -25,11 +25,15 @@ import { ByteSize, RelativeTime } from "@/components/ui/primitives";
  * key, so each filter combination caches independently and the SSE `backup.state`
  * event keeps the visible page fresh without a manual refresh.
  */
+import { Button } from "@/components/ui/button";
+import { ManualBackupDialog } from "@/components/dialogs/manual-backup-dialog";
+
 export default function BackupsPage() {
   const [status, setStatus] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
   const [guestType, setGuestType] = useState("");
   const [search, setSearch] = useState("");
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   const params = {
     status: status || undefined,
@@ -41,7 +45,15 @@ export default function BackupsPage() {
 
   return (
     <div>
-      <PageHeader title="Backups" description="Every backup artifact and its upload state" />
+      <PageHeader
+        title="Backups"
+        description="Every backup artifact and its upload state"
+        actions={
+          <Button onClick={() => setShowBackupModal(true)}>
+            ⚡ Run Manual Backup
+          </Button>
+        }
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Input
@@ -134,6 +146,42 @@ export default function BackupsPage() {
           </Table>
         )}
       </DataState>
+
+      {showBackupModal && (
+        <>
+          <button
+            type="button"
+            aria-label="Close dialog"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowBackupModal(false)}
+          />
+          <dialog
+            open
+            aria-labelledby="manual-backup-title"
+            className="fixed left-1/2 top-1/2 z-50 m-0 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-muted bg-surface p-0 text-fg-default shadow-2xl"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowBackupModal(false);
+            }}
+          >
+            <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
+              <h2 id="manual-backup-title" className="text-base font-semibold">
+                Start Manual Backup
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowBackupModal(false)}
+                className="text-lg text-fg-muted transition-colors hover:text-fg-default"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="max-h-[85vh] overflow-y-auto px-5 py-4">
+              <ManualBackupDialog onClose={() => setShowBackupModal(false)} />
+            </div>
+          </dialog>
+        </>
+      )}
     </div>
   );
 }
