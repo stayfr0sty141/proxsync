@@ -268,7 +268,7 @@ class SyncService:
 
         if task.backup_id:
             record = await self._history.get(task.backup_id)
-            if record and record.upload_status == UploadStatus.UPLOADING.value:
+            if record:
                 record.upload_status = UploadStatus.FAILED.value
 
         await self._tasks.flush()
