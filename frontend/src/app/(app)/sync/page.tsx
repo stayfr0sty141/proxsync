@@ -151,7 +151,7 @@ export default function SyncPage() {
                           <div className="flex flex-col">
                             <span className="capitalize font-medium text-fg-default">{opName}</span>
                             {t.filename && (
-                              <span className="font-mono text-xs text-fg-muted truncate max-w-[280px]">
+                              <span className="font-mono text-xs text-fg-muted truncate max-w-70">
                                 {t.filename}
                               </span>
                             )}
