@@ -85,6 +85,8 @@ reach Drive (`rclone about gdrive:`).
 remote publishes no hash at all, ProxSync reports `hash_unavailable` rather than claiming the
 file is verified. This is not an error.
 
+**`Error 403: Quota exceeded for quota metric 'Queries'...`** rclone is using its default shared Google Client ID, which shares a global API quota limit across all rclone users. Configure your own dedicated Google Cloud OAuth 2.0 `client_id` and `client_secret` in the host's `rclone.conf` under your remote section. This grants you a dedicated quota of 20,000 requests per 100 seconds.
+
 ---
 
 ## Restores
