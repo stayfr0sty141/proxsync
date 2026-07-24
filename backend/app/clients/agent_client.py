@@ -17,6 +17,7 @@ import hmac
 import json
 import random
 import secrets
+import ssl
 import time
 from typing import Any, Self
 
@@ -76,12 +77,20 @@ class AgentClient:
 
     @staticmethod
     def _build_client(settings: Settings) -> httpx.AsyncClient:
-        verify: bool | str = settings.agent_verify_tls
-        if settings.agent_ca_cert is not None:
-            verify = str(settings.agent_ca_cert)
-
+        verify: bool | str | ssl.SSLContext = settings.agent_verify_tls
         cert: Any = None
-        if settings.agent_client_cert and settings.agent_client_key:
+
+        if settings.agent_ca_cert is not None:
+            ctx = ssl.create_default_context(
+                purpose=ssl.Purpose.SERVER_AUTH, cafile=str(settings.agent_ca_cert)
+            )
+            if settings.agent_client_cert and settings.agent_client_key:
+                ctx.load_cert_chain(
+                    certfile=str(settings.agent_client_cert),
+                    keyfile=str(settings.agent_client_key),
+                )
+            verify = ctx
+        elif settings.agent_client_cert and settings.agent_client_key:
             cert = (str(settings.agent_client_cert), str(settings.agent_client_key))
 
         return httpx.AsyncClient(
@@ -134,6 +143,14 @@ class AgentClient:
             headers[HEADER_CORRELATION_ID] = correlation_id
         return headers
 
+    def _prepare_headers(
+        self, method: str, signed_path: str, body: bytes, has_payload: bool
+    ) -> dict[str, str]:
+        headers = self._headers(method, signed_path, body)
+        if has_payload:
+            headers["Content-Type"] = "application/json"
+        return headers
+
     async def _request(
         self,
         method: str,
@@ -155,15 +172,11 @@ class AgentClient:
                 "Check that proxsync-agent is running on the Proxmox host."
             )
 
-        # The body must be signed exactly as sent, so serialise once and pass bytes through.
         body = b"" if payload is None else json.dumps(payload).encode()
         query = httpx.QueryParams(params or {})
         signed_path = f"{path}?{query}" if str(query) else path
 
-        headers = self._headers(method, signed_path, body)
-        if payload is not None:
-            headers["Content-Type"] = "application/json"
-
+        headers = self._prepare_headers(method, signed_path, body, payload is not None)
         attempts = self._settings.agent_max_retries + 1 if method in _RETRYABLE_METHODS else 1
         last_error: Exception | None = None
 
@@ -183,10 +196,7 @@ class AgentClient:
                 )
                 if attempt + 1 < attempts:
                     await asyncio.sleep(_backoff(attempt))
-                    # A retry is a new request: re-sign so the timestamp stays inside the window.
-                    headers = self._headers(method, signed_path, body)
-                    if payload is not None:
-                        headers["Content-Type"] = "application/json"
+                    headers = self._prepare_headers(method, signed_path, body, payload is not None)
                     continue
                 break
             else:
@@ -434,4 +444,4 @@ class AgentClient:
 def _backoff(attempt: int) -> float:
     """Exponential backoff with full jitter, so parallel callers do not retry in lockstep."""
     ceiling = min(_BACKOFF_MAX_SECONDS, _BACKOFF_BASE_SECONDS * (2**attempt))
-    return random.uniform(0, ceiling)  # noqa: S311 - jitter, not cryptography
+    return random.uniform(0, ceiling)  # noqa: S311
