@@ -1,6 +1,10 @@
 "use client";
 
-import { useBrowserCompare } from "@/hooks/queries";
+import { toast } from "sonner";
+import { useBrowserCompare, useInvalidatingMutation } from "@/hooks/queries";
+import { api } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/problem";
+import { queryDomains } from "@/lib/query-keys";
 import { PageHeader } from "@/components/ui/page-header";
 import { DataState } from "@/components/ui/data-state";
 import {
@@ -13,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ByteSize } from "@/components/ui/primitives";
 import type { ComparisonEntry } from "@/types/api";
 
@@ -67,6 +72,7 @@ export default function BrowserPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Local size</TableHead>
                 <TableHead>Remote size</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -91,6 +97,11 @@ export default function BrowserPage() {
                     <TableCell>
                       <ByteSize bytes={remoteSize} />
                     </TableCell>
+                    <TableCell className="text-right">
+                      {entry.backup_id && entry.state !== "in_sync" && (
+                        <UploadButton backupId={entry.backup_id} />
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -99,5 +110,28 @@ export default function BrowserPage() {
         )}
       </DataState>
     </div>
+  );
+}
+
+function UploadButton({ backupId }: Readonly<{ backupId: number }>) {
+  const upload = useInvalidatingMutation(
+    () => api.post(`/backups/${backupId}/upload`, { force: true }),
+    [queryDomains.sync, queryDomains.backups, queryDomains.storage],
+  );
+
+  function handleUpload() {
+    upload.mutate(undefined, {
+      onSuccess: () => toast.success("Upload queued to Google Drive"),
+      onError: (err: unknown) =>
+        toast.error(
+          err instanceof ApiError ? err.problem.detail || err.problem.title : "Upload failed",
+        ),
+    });
+  }
+
+  return (
+    <Button size="sm" variant="secondary" onClick={handleUpload} disabled={upload.isPending}>
+      {upload.isPending ? "Queuing…" : "Upload"}
+    </Button>
   );
 }
