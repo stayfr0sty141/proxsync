@@ -52,7 +52,7 @@ in docs/HANDOFF.md.
   upgrade scripts with a daily backup timer, dependency-audit and frontend CI plus Dependabot,
   and the install / upgrade / security / troubleshooting / contributing guides.
 
-### Fixed
+### Bug Fixes
 
 Ten subtle bugs found while building, each invisible in normal operation and each with a
 regression test — see docs/HANDOFF.md §5 for the full accounting. Highlights: `BigInteger`

@@ -70,6 +70,7 @@ The installer owns `table inet proxsync`. It creates `/etc/nftables.d/proxsync.n
 - `--remove-firewall` removes only the ProxSync table, loader, agent dependency drop-in, and unit, but strictly verifies ownership first.
 
 You can check firewall state using:
+
 ```bash
 systemctl status proxsync-firewall
 systemctl show proxsync-agent -p Requires -p After
