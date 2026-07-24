@@ -53,6 +53,7 @@ class SqlAlchemySyncTaskRepository(SqlAlchemyRepository):
         remote_path: str,
         max_attempts: int,
         correlation_id: str | None,
+        bytes_total: int | None = None,
     ) -> SyncTask:
         task = SyncTask(
             backup_id=backup_id,
@@ -62,6 +63,7 @@ class SqlAlchemySyncTaskRepository(SqlAlchemyRepository):
             remote_path=remote_path,
             max_attempts=max_attempts,
             correlation_id=correlation_id,
+            bytes_total=bytes_total,
         )
         self._session.add(task)
         await self._session.flush()
@@ -117,4 +119,4 @@ class SqlAlchemySyncTaskRepository(SqlAlchemyRepository):
         statement = select(func.count()).select_from(SyncTask)
         if status is not None:
             statement = statement.where(SyncTask.status == status.value)
-        return int((await self._session.execute(statement)).scalar_one())
+        return (await self._session.execute(statement)).scalar_one()

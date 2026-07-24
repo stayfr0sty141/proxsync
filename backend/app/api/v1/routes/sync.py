@@ -164,6 +164,54 @@ async def list_sync_tasks(
     )
 
 
+@router.post("/tasks/{task_id}/cancel", summary="Cancel an in-progress transfer")
+@router.post("/sync/tasks/{task_id}/cancel", summary="Cancel an in-progress transfer")
+async def cancel_sync_task(
+    task_id: int,
+    service: SyncServiceDep,
+    container: ContainerDep,
+    session: SessionDep,
+    user: RequireOperator,
+    audit: AuditRepositoryDep,
+) -> SyncTaskResponse:
+    async with container.retention_guard.transaction(session):
+        task = await service.cancel_task(task_id)
+        await audit.record(
+            action=AuditAction.SETTINGS_CHANGED,
+            user_id=user.id,
+            username=user.username,
+            resource_type="sync_task",
+            resource_id=str(task.id),
+            detail={"action": "cancel", "task_id": task_id},
+        )
+        container.sync_worker.notify_after_commit(session)
+        return await service.to_response(task)
+
+
+@router.post("/tasks/{task_id}/retry", summary="Retry a failed transfer")
+@router.post("/sync/tasks/{task_id}/retry", summary="Retry a failed transfer")
+async def retry_sync_task(
+    task_id: int,
+    service: SyncServiceDep,
+    container: ContainerDep,
+    session: SessionDep,
+    user: RequireOperator,
+    audit: AuditRepositoryDep,
+) -> SyncTaskResponse:
+    async with container.retention_guard.transaction(session):
+        task = await service.retry_task(task_id)
+        await audit.record(
+            action=AuditAction.SETTINGS_CHANGED,
+            user_id=user.id,
+            username=user.username,
+            resource_type="sync_task",
+            resource_id=str(task.id),
+            detail={"action": "retry", "task_id": task_id},
+        )
+        container.sync_worker.notify_after_commit(session)
+        return await service.to_response(task)
+
+
 @router.get("/sync/quota", summary="Remote storage quota")
 async def remote_quota(
     service: SyncServiceDep, container: ContainerDep, user: RequireViewer

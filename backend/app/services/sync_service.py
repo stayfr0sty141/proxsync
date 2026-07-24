@@ -12,6 +12,7 @@ but the remote publishes no hash" is reported as unverified rather than quietly 
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -111,6 +112,7 @@ class SyncService:
             remote_path=config.folder,
             max_attempts=config.upload_retry + 1,
             correlation_id=get_correlation_id(),
+            bytes_total=record.size_bytes,
         )
         record.upload_status = UploadStatus.PENDING.value
         await self._tasks.flush()
@@ -247,6 +249,51 @@ class SyncService:
             raise NotFound(f"No sync task with id {task_id}")
         return task
 
+    async def cancel_task(self, task_id: int) -> SyncTask:
+        task = await self.get_task(task_id)
+        if task.status in (
+            SyncStatus.SUCCESS.value,
+            SyncStatus.FAILED.value,
+            SyncStatus.CANCELLED.value,
+        ):
+            raise Conflict(f"Sync task #{task_id} is already '{task.status}'.")
+
+        task.status = SyncStatus.CANCELLED.value
+        task.finished_at = datetime.now(UTC)
+        task.error_message = "Cancelled by operator"
+
+        if task.agent_task_id:
+            with contextlib.suppress(AgentError, AgentUnavailable):
+                await self._agent.cancel_task(task.agent_task_id)
+
+        if task.backup_id:
+            record = await self._history.get(task.backup_id)
+            if record and record.upload_status == UploadStatus.UPLOADING.value:
+                record.upload_status = UploadStatus.FAILED.value
+
+        await self._tasks.flush()
+        logger.info("sync_task_cancelled", sync_task_id=task_id)
+        return task
+
+    async def retry_task(self, task_id: int) -> SyncTask:
+        task = await self.get_task(task_id)
+        task.status = SyncStatus.QUEUED.value
+        task.attempt = 1
+        task.error_message = None
+        task.next_retry_at = None
+        task.started_at = None
+        task.finished_at = None
+        task.agent_task_id = None
+
+        if task.backup_id:
+            record = await self._history.get(task.backup_id)
+            if record:
+                record.upload_status = UploadStatus.PENDING.value
+
+        await self._tasks.flush()
+        logger.info("sync_task_retry_queued", sync_task_id=task_id)
+        return task
+
     async def queue_status(self, *, current: SyncTask | None = None) -> SyncQueueStatus:
         config = await self.config()
         return SyncQueueStatus(
@@ -262,13 +309,17 @@ class SyncService:
 
     async def to_response(self, task: SyncTask) -> SyncTaskResponse:
         filename: str | None = None
+        record_size: int | None = None
         if task.backup_id is not None:
             record = await self._history.get(task.backup_id)
-            filename = record.filename if record is not None else None
+            if record is not None:
+                filename = record.filename
+                record_size = record.size_bytes
 
+        bytes_total = task.bytes_total or record_size
         percent: float | None = None
-        if task.bytes_total:
-            percent = round(task.bytes_transferred / task.bytes_total * 100, 1)
+        if bytes_total:
+            percent = round(task.bytes_transferred / bytes_total * 100, 1)
 
         return SyncTaskResponse(
             id=task.id,
@@ -279,7 +330,7 @@ class SyncService:
             agent_task_id=task.agent_task_id,
             remote_name=task.remote_name,
             remote_path=task.remote_path,
-            bytes_total=task.bytes_total,
+            bytes_total=bytes_total,
             bytes_transferred=task.bytes_transferred,
             transfer_rate_bps=task.transfer_rate_bps,
             percent=percent,

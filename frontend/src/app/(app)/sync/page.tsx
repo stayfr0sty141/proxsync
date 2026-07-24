@@ -160,13 +160,24 @@ export default function SyncPage() {
                         <TableCell>
                           <StatusBadge domain="sync" status={t.status} />
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <ByteSize bytes={sizeBytes} />
-                            {t.percent !== null && t.percent !== undefined && (
-                              <span className="text-xs text-brand font-mono font-medium">
-                                {t.percent}%
-                              </span>
+                        <TableCell className="min-w-50">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <ByteSize bytes={sizeBytes} />
+                              {t.percent !== null && t.percent !== undefined && (
+                                <span className="text-brand font-semibold">{t.percent}%</span>
+                              )}
+                            </div>
+                            {(t.status === "running" ||
+                              (t.percent !== null && t.percent !== undefined)) && (
+                              <div className="w-full bg-bg-muted rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-brand h-full transition-all duration-300 rounded-full"
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, t.percent ?? 0))}%`,
+                                  }}
+                                />
+                              </div>
                             )}
                           </div>
                         </TableCell>
