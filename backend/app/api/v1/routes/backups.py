@@ -135,9 +135,21 @@ async def get_backup_log(
     del user
     record = await service.get_backup(backup_id)
     if record.agent_task_id is None:
-        raise NotFound(
-            f"Backup #{backup_id} has no agent task, so there is no log to read — it failed "
-            "before the agent was asked to start it. The reason is on the backup itself."
+        if record.status == BackupStatus.FAILED.value and record.filename is None:
+            raise NotFound(
+                f"Backup #{backup_id} has no agent task, so there is no log to read — it failed "
+                "before the agent was asked to start it. The reason is on the backup itself."
+            )
+        filename_str = f" ({record.filename})" if record.filename else ""
+        return BackupLogResponse(
+            backup_id=backup_id,
+            task_id="",
+            lines=[
+                f"Backup #{backup_id}{filename_str} was imported from disk storage. "
+                "No active agent task log is attached."
+            ],
+            truncated=False,
+            total_lines=1,
         )
 
     log = await container.agent.get_task_log(record.agent_task_id, tail=tail)
