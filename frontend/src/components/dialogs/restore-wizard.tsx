@@ -6,13 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/problem";
 import { queryDomains } from "@/lib/query-keys";
+import { useBackups, useStorageStatus } from "@/hooks/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { formatDuration } from "@/lib/format";
+import { formatBytes, formatDuration } from "@/lib/format";
 import type {
   PreflightReport,
   RestoreCreatedResponse,
@@ -160,17 +161,44 @@ function TargetStep({
   busy: boolean;
   onNext: () => void;
 }>) {
+  const backups = useBackups({ status: "success", limit: 100 });
+  const storageStatus = useStorageStatus();
+
+  const validBackups = backups.data?.items ?? [];
+  const storagePools = storageStatus.data?.storages.filter((s) => s.active) ?? [];
+
   const valid =
     form.backup_id > 0 && form.target_vmid > 0 && form.target_storage && form.target_node;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Backup ID">
-          <Input
-            type="number"
-            value={form.backup_id || ""}
-            onChange={(e) => update("backup_id", Number(e.target.value))}
-          />
+        <Field label="Backup File">
+          <Select
+            value={form.backup_id ? String(form.backup_id) : ""}
+            onChange={(e) => {
+              const selectedId = Number(e.target.value);
+              const backup = validBackups.find((b) => b.id === selectedId);
+              if (backup) {
+                update("backup_id", backup.id);
+                update("restore_mode", backup.guest_type === "lxc" ? "lxc" : "qemu");
+                update("target_vmid", backup.vmid);
+                update("target_node", backup.node || "server");
+                update("target_storage", backup.storage || "hdd_3tb");
+              } else {
+                update("backup_id", selectedId);
+              }
+            }}
+          >
+            <option value="">
+              {backups.isLoading ? "Loading backup files..." : "-- Select a Backup File --"}
+            </option>
+            {validBackups.map((b) => (
+              <option key={b.id} value={b.id}>
+                #{b.id} - {b.filename} ({b.guest_name || `${b.guest_type.toUpperCase()} ${b.vmid}`} - {formatBytes(b.size_bytes)})
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Restore mode">
           <Select
@@ -186,16 +214,36 @@ function TargetStep({
             type="number"
             value={form.target_vmid || ""}
             onChange={(e) => update("target_vmid", Number(e.target.value))}
+            placeholder="e.g. 100"
           />
         </Field>
         <Field label="Target node">
-          <Input value={form.target_node} onChange={(e) => update("target_node", e.target.value)} />
+          <Input
+            value={form.target_node}
+            onChange={(e) => update("target_node", e.target.value)}
+            placeholder="e.g. server"
+          />
         </Field>
         <Field label="Target storage">
-          <Input
-            value={form.target_storage}
-            onChange={(e) => update("target_storage", e.target.value)}
-          />
+          {storagePools.length > 0 ? (
+            <Select
+              value={form.target_storage}
+              onChange={(e) => update("target_storage", e.target.value)}
+            >
+              <option value="">-- Select Target Storage --</option>
+              {storagePools.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name} ({p.type} - {formatBytes(p.total_bytes - p.used_bytes)} free)
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <Input
+              value={form.target_storage}
+              onChange={(e) => update("target_storage", e.target.value)}
+              placeholder="e.g. hdd_3tb"
+            />
+          )}
         </Field>
       </div>
 
