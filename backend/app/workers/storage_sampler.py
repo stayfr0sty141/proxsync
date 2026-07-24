@@ -9,12 +9,16 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from datetime import UTC, datetime
+from typing import Any
 
 from app.core.config import Settings
 from app.core.crypto import SecretBox
 from app.core.events import EVENT_STORAGE_UPDATE, EventBus
 from app.core.logging import logger, set_correlation_id
+from app.db.models.backup import BackupHistory
 from app.db.session import Database
+from app.repositories.backup_history_repository import SqlAlchemyBackupHistoryRepository
+from app.repositories.guest_repository import SqlAlchemyGuestRepository
 from app.repositories.settings_repository import SqlAlchemySettingsRepository
 from app.repositories.storage_snapshot_repository import (
     NewStorageSnapshot,
@@ -22,8 +26,14 @@ from app.repositories.storage_snapshot_repository import (
     StorageSnapshotRecord,
 )
 from app.schemas.agent import AgentRemoteQuota
-from app.schemas.enums import NotificationEvent, SettingsSection
-from app.schemas.settings import GDriveSettings, RetentionSettings
+from app.schemas.enums import (
+    BackupMode,
+    BackupStatus,
+    NotificationEvent,
+    SettingsSection,
+    UploadStatus,
+)
+from app.schemas.settings import GDriveSettings, ProxmoxSettings, RetentionSettings
 from app.schemas.storage import StorageSeverity
 from app.services.notification_service import NotificationGateway
 from app.services.settings_service import SettingsService
@@ -120,6 +130,7 @@ class StorageSampler:
             # No database session is alive across either request.
             try:
                 local = await self._agent.storage_status()
+                await self._sync_disk_artifacts()
             except Exception as exc:  # noqa: BLE001 - a missing sample is safer than fake zeros
                 self._last_error = str(getattr(exc, "detail", None) or exc)
                 logger.warning("storage_local_sample_unavailable", error=self._last_error)
@@ -232,3 +243,67 @@ class StorageSampler:
             warning_percent=retention.storage_warning_percent,
             critical_percent=retention.storage_critical_percent,
         )
+
+    async def _sync_disk_artifacts(self) -> None:
+        list_fn = getattr(self._agent, "list_artifacts", None)
+        if not callable(list_fn):
+            return
+        try:
+            raw_artifacts = list_fn()
+            artifacts: list[Any] = (
+                await raw_artifacts if asyncio.iscoroutine(raw_artifacts) else raw_artifacts
+            )
+            async with self._database.session() as session:
+                history_repo = SqlAlchemyBackupHistoryRepository(session)
+                guest_repo = SqlAlchemyGuestRepository(session)
+                settings_svc = SettingsService(
+                    repository=SqlAlchemySettingsRepository(session), secret_box=self._secret_box
+                )
+                pve_section = await settings_svc.get_section(SettingsSection.PROXMOX)
+                if not isinstance(pve_section, ProxmoxSettings):
+                    return
+                node_name = pve_section.node or "server"
+
+                existing = {
+                    item.filename
+                    for item in await history_repo.search(limit=10000)
+                    if item.filename
+                }
+                all_guests = {(g.vmid, g.guest_type): g for g in await guest_repo.list_all()}
+
+                for art in artifacts:
+                    if art.filename not in existing:
+                        guest_obj = all_guests.get((art.vmid, art.guest_type.value))
+                        guest_name = (
+                            guest_obj.name
+                            if guest_obj
+                            else f"{art.guest_type.value.upper()} {art.vmid}"
+                        )
+                        guest_id = guest_obj.id if guest_obj else None
+                        comp_val = (
+                            art.compression.value
+                            if hasattr(art.compression, "value")
+                            else str(art.compression)
+                        )
+                        rec = BackupHistory(
+                            vmid=art.vmid,
+                            guest_type=art.guest_type.value,
+                            guest_name=guest_name,
+                            node=node_name,
+                            storage="hdd_3tb",
+                            filename=art.filename,
+                            local_path=str(art.path),
+                            size_bytes=art.size_bytes,
+                            mode=BackupMode.SNAPSHOT.value,
+                            compression=comp_val,
+                            checksum_sha256=getattr(art, "checksum_sha256", None),
+                            status=BackupStatus.SUCCESS.value,
+                            upload_status=UploadStatus.NOT_REQUIRED.value,
+                            started_at=art.created_at,
+                            finished_at=art.created_at,
+                            guest_id=guest_id,
+                        )
+                        session.add(rec)
+                await session.commit()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("storage_disk_artifacts_sync_failed", error=str(exc))
