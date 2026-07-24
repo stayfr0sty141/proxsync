@@ -26,6 +26,7 @@ OLD_SERVICE_ACTIVE=0
 OLD_SERVICE_ENABLED=0
 OLD_FIREWALL_ENABLED=0
 OLD_FIREWALL_RUNTIME=0
+OLD_FIREWALL_EXISTS=0
 FIREWALL_MODE_SET=""
 
 log()  { printf '\033[0;36m[proxsync]\033[0m %s\n' "$*"; }
@@ -778,6 +779,7 @@ begin_transaction() {
     install -d -m 0700 "$BACKUP_DIR"
     if systemctl is-active --quiet "$SERVICE"; then OLD_SERVICE_ACTIVE=1; fi
     if systemctl is-enabled --quiet "$SERVICE"; then OLD_SERVICE_ENABLED=1; fi
+    if [[ -f "$FIREWALL_UNIT" ]]; then OLD_FIREWALL_EXISTS=1; fi
     if systemctl is-enabled --quiet "$FIREWALL_SERVICE"; then OLD_FIREWALL_ENABLED=1; fi
     if systemctl is-active --quiet "$FIREWALL_SERVICE"; then OLD_FIREWALL_ACTIVE=1; fi
     if systemctl is-failed --quiet "$FIREWALL_SERVICE"; then OLD_FIREWALL_FAILED=1; fi
@@ -831,7 +833,7 @@ rollback_on_error() {
         fi
         if [[ "$OLD_FIREWALL_ENABLED" -eq 1 ]]; then
             systemctl enable "$FIREWALL_SERVICE" >/dev/null 2>&1
-        elif [[ "$OLD_FIREWALL_EXISTS" -eq 1 ]]; then
+        elif [[ "${OLD_FIREWALL_EXISTS:-0}" -eq 1 ]]; then
             systemctl disable "$FIREWALL_SERVICE" >/dev/null 2>&1
         else
             rm -f "$FIREWALL_FILE" "$FIREWALL_LOADER" "/usr/libexec/proxsync-verify-firewall" "$FIREWALL_UNIT"
