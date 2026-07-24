@@ -430,7 +430,9 @@ generate_ca() {
     local tls_dir="$1"
     openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
         -keyout "${tls_dir}/ca.key" -out "${tls_dir}/ca.crt" \
-        -subj "/CN=ProxSync Agent CA/O=ProxSync" >/dev/null 2>&1
+        -subj "/CN=ProxSync Agent CA/O=ProxSync" \
+        -addext "basicConstraints=critical,CA:TRUE" \
+        -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
     chmod 0640 "${tls_dir}/ca.key"
     chmod 0644 "${tls_dir}/ca.crt"
 }
