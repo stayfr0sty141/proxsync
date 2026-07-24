@@ -464,7 +464,8 @@ export interface SyncQueueStatus {
 export interface RemoteQuotaResponse {
   remote: string;
   configured: boolean;
-  quota_bytes: number | null;
+  total_bytes?: number | null;
+  quota_bytes?: number | null;
   used_bytes: number | null;
   free_bytes: number | null;
   trashed_bytes: number | null;

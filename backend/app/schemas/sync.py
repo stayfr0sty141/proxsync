@@ -98,6 +98,11 @@ class RemoteQuotaResponse(BaseModel):
     used_percent: float | None = None
     detail: str | None = None
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def quota_bytes(self) -> int | None:
+        return self.total_bytes
+
 
 # ---- browser -----------------------------------------------------------------
 
