@@ -84,6 +84,7 @@ class AgentClient:
             ctx = ssl.create_default_context(
                 purpose=ssl.Purpose.SERVER_AUTH, cafile=str(settings.agent_ca_cert)
             )
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             if settings.agent_client_cert and settings.agent_client_key:
                 ctx.load_cert_chain(
                     certfile=str(settings.agent_client_cert),

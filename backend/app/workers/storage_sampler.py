@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from app.core.config import Settings
 from app.core.crypto import SecretBox
@@ -78,6 +79,7 @@ class StorageSampler:
             "storage_sampler_started",
             interval_seconds=self._settings.storage_sample_interval_seconds,
         )
+        await asyncio.sleep(0)
 
     async def stop(self) -> None:
         self._stopping.set()
@@ -244,6 +246,40 @@ class StorageSampler:
             critical_percent=retention.storage_critical_percent,
         )
 
+    @staticmethod
+    def _create_artifact_history_record(
+        art: Any, node_name: str, guest_obj: Any | None
+    ) -> BackupHistory:
+        guest_name = (
+            guest_obj.name
+            if guest_obj
+            else f"{art.guest_type.value.upper()} {art.vmid}"
+        )
+        guest_id = guest_obj.id if guest_obj else None
+        comp_val = (
+            art.compression.value
+            if hasattr(art.compression, "value")
+            else str(art.compression)
+        )
+        return BackupHistory(
+            vmid=art.vmid,
+            guest_type=art.guest_type.value,
+            guest_name=guest_name,
+            node=node_name,
+            storage="hdd_3tb",
+            filename=art.filename,
+            local_path=str(art.path),
+            size_bytes=art.size_bytes,
+            mode=BackupMode.SNAPSHOT.value,
+            compression=comp_val,
+            checksum_sha256=getattr(art, "checksum_sha256", None),
+            status=BackupStatus.SUCCESS.value,
+            upload_status=UploadStatus.NOT_REQUIRED.value,
+            started_at=art.created_at,
+            finished_at=art.created_at,
+            guest_id=guest_id,
+        )
+
     async def _sync_disk_artifacts(self) -> None:
         list_fn = getattr(self._agent, "list_artifacts", None)
         if not callable(list_fn):
@@ -251,7 +287,9 @@ class StorageSampler:
         try:
             raw_artifacts = list_fn()
             artifacts: list[Any] = (
-                await raw_artifacts if asyncio.iscoroutine(raw_artifacts) else raw_artifacts
+                cast(list[Any], await raw_artifacts)
+                if inspect.isawaitable(raw_artifacts)
+                else cast(list[Any], raw_artifacts)
             )
             async with self._database.session() as session:
                 history_repo = SqlAlchemyBackupHistoryRepository(session)
@@ -274,35 +312,7 @@ class StorageSampler:
                 for art in artifacts:
                     if art.filename not in existing:
                         guest_obj = all_guests.get((art.vmid, art.guest_type.value))
-                        guest_name = (
-                            guest_obj.name
-                            if guest_obj
-                            else f"{art.guest_type.value.upper()} {art.vmid}"
-                        )
-                        guest_id = guest_obj.id if guest_obj else None
-                        comp_val = (
-                            art.compression.value
-                            if hasattr(art.compression, "value")
-                            else str(art.compression)
-                        )
-                        rec = BackupHistory(
-                            vmid=art.vmid,
-                            guest_type=art.guest_type.value,
-                            guest_name=guest_name,
-                            node=node_name,
-                            storage="hdd_3tb",
-                            filename=art.filename,
-                            local_path=str(art.path),
-                            size_bytes=art.size_bytes,
-                            mode=BackupMode.SNAPSHOT.value,
-                            compression=comp_val,
-                            checksum_sha256=getattr(art, "checksum_sha256", None),
-                            status=BackupStatus.SUCCESS.value,
-                            upload_status=UploadStatus.NOT_REQUIRED.value,
-                            started_at=art.created_at,
-                            finished_at=art.created_at,
-                            guest_id=guest_id,
-                        )
+                        rec = self._create_artifact_history_record(art, node_name, guest_obj)
                         session.add(rec)
                 await session.commit()
         except Exception as exc:  # noqa: BLE001

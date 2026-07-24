@@ -75,8 +75,11 @@
 
 /* Map the CSS custom properties into Tailwind's color system so utilities like
  * `bg-surface`, `text-muted`, `border-default` resolve to the active theme. */
+@utility bg-base {
+  background-color: var(--bg-base);
+}
+
 @theme inline {
-  --color-base: var(--bg-base);
   --color-surface: var(--bg-surface);
   --color-elevated: var(--bg-elevated);
   --color-inset: var(--bg-inset);

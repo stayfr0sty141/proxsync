@@ -113,7 +113,7 @@ export default function SchedulesPage() {
             }}
           >
             <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-              <h2 id="create-schedule-title" className="text-base font-semibold text-fg-default">
+              <h2 id="create-schedule-title" className="text-base font-semibold">
                 New Schedule
               </h2>
               <button
