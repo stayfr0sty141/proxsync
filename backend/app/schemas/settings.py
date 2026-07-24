@@ -161,7 +161,7 @@ class ProxmoxSettings(SectionModel):
     The API token lives in the environment and must hold `PVEAuditor` and nothing more.
     """
 
-    node: str = "pve"
+    node: str = ""
     inventory_refresh_seconds: Annotated[int, Field(ge=30, le=86400)] = 300
     auto_enable_new_guests: bool = False
     """When false, a guest discovered on the host is *not* backed up until an admin enables
