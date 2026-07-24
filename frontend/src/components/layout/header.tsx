@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { Menu, Moon, Sun, Bell, KeyRound } from "lucide-react";
+import { Menu, Moon, Sun, Bell, KeyRound, Zap } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useNotifications } from "@/hooks/queries";
 import { AgentStatusPill } from "./agent-status-pill";
 import { ChangePasswordDialog } from "@/components/dialogs/change-password-dialog";
+import { ManualBackupDialog } from "@/components/dialogs/manual-backup-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { data: notifications } = useNotifications({ status: "pending", limit: 1 });
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   const pending = notifications?.pending ?? 0;
   const isDark = (resolvedTheme ?? theme) !== "light";
@@ -35,6 +37,16 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       </Button>
 
       <div className="flex-1" />
+
+      <Button
+        variant="secondary"
+        size="sm"
+        className="gap-1.5 text-xs font-medium"
+        onClick={() => setShowBackupModal(true)}
+      >
+        <Zap className="size-3.5 text-accent fill-accent" />
+        <span>Backup</span>
+      </Button>
 
       <AgentStatusPill />
 
@@ -89,6 +101,42 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           forced={mustChangePassword}
           onClose={() => setShowPasswordDialog(false)}
         />
+      )}
+
+      {showBackupModal && (
+        <>
+          <button
+            type="button"
+            aria-label="Close dialog"
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowBackupModal(false)}
+          />
+          <dialog
+            open
+            aria-labelledby="header-manual-backup-title"
+            className="fixed left-1/2 top-1/2 z-50 m-0 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border-muted bg-surface p-0 text-fg-default shadow-2xl"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setShowBackupModal(false);
+            }}
+          >
+            <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
+              <h2 id="header-manual-backup-title" className="text-base font-semibold">
+                Start Manual Backup
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowBackupModal(false)}
+                className="text-lg text-fg-muted transition-colors hover:text-fg-default"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="max-h-[85vh] overflow-y-auto px-5 py-4">
+              <ManualBackupDialog onClose={() => setShowBackupModal(false)} />
+            </div>
+          </dialog>
+        </>
       )}
     </header>
   );
