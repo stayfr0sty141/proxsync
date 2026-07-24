@@ -77,7 +77,8 @@ export default function BrowserPage() {
             </TableHeader>
             <TableBody>
               {d.entries.map((entry: ComparisonEntry) => {
-                const name = entry.name || (entry as unknown as Record<string, string>).filename;
+                const name =
+                  entry.name || (entry as unknown as Record<string, string>).filename || "";
                 const localSize =
                   entry.local_size ??
                   (entry as unknown as Record<string, number | null>).local_size_bytes;
@@ -98,8 +99,8 @@ export default function BrowserPage() {
                       <ByteSize bytes={remoteSize} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {entry.backup_id && entry.state !== "in_sync" && (
-                        <UploadButton backupId={entry.backup_id} />
+                      {entry.state !== "in_sync" && (
+                        <UploadButton backupId={entry.backup_id} filename={name} />
                       )}
                     </TableCell>
                   </TableRow>
@@ -113,9 +114,15 @@ export default function BrowserPage() {
   );
 }
 
-function UploadButton({ backupId }: Readonly<{ backupId: number }>) {
+function UploadButton({
+  backupId,
+  filename,
+}: Readonly<{ backupId?: number | null; filename?: string }>) {
   const upload = useInvalidatingMutation(
-    () => api.post(`/backups/${backupId}/upload`, { force: true }),
+    () =>
+      backupId
+        ? api.post(`/backups/${backupId}/upload`, { force: true })
+        : api.post("/sync/upload_artifact", { filename, force: true }),
     [queryDomains.sync, queryDomains.backups, queryDomains.storage],
   );
 

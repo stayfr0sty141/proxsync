@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
+from pydantic import BaseModel
 
 from app.api.deps import (
     AuditRepositoryDep,
@@ -61,6 +62,40 @@ async def upload_backup(
         )
         container.sync_worker.notify_after_commit(session)
         container.retention_worker.notify_after_commit(session, backup_id)
+        return await service.to_response(task)
+
+
+class UploadArtifactPayload(BaseModel):
+    filename: str
+    force: bool = True
+
+
+@router.post(
+    "/upload_artifact",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload an artifact by filename to Google Drive",
+)
+async def upload_artifact(
+    payload: UploadArtifactPayload,
+    service: SyncServiceDep,
+    container: ContainerDep,
+    session: SessionDep,
+    user: RequireOperator,
+    audit: AuditRepositoryDep,
+) -> SyncTaskResponse:
+    async with container.retention_guard.transaction(session):
+        task = await service.enqueue_upload_by_filename(payload.filename, force=payload.force)
+        await audit.record(
+            action=AuditAction.SETTINGS_CHANGED,
+            user_id=user.id,
+            username=user.username,
+            resource_type="sync_task",
+            resource_id=str(task.id),
+            detail={"filename": payload.filename, "force": payload.force},
+        )
+        container.sync_worker.notify_after_commit(session)
+        if task.backup_id:
+            container.retention_worker.notify_after_commit(session, task.backup_id)
         return await service.to_response(task)
 
 
@@ -136,9 +171,7 @@ async def remote_quota(
     try:
         quota = await container.agent.remote_quota(remote=config.remote_name)
     except (AgentUnavailable, AgentError) as exc:
-        return RemoteQuotaResponse(
-            remote=config.remote_name, configured=True, detail=str(exc.detail)
-        )
+        return RemoteQuotaResponse(remote=config.remote_name, configured=True, detail=exc.detail)
 
     return RemoteQuotaResponse(
         remote=config.remote_name,

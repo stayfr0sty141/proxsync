@@ -23,6 +23,7 @@ from app.repositories.backup_history_repository import SqlAlchemyBackupHistoryRe
 from app.repositories.sync_task_repository import SqlAlchemySyncTaskRepository
 from app.schemas.agent import AgentVerifyResult
 from app.schemas.enums import (
+    BackupMode,
     BackupStatus,
     GuestType,
     SettingsSection,
@@ -122,6 +123,38 @@ class SyncService:
             remote=config.remote_name,
         )
         return task
+
+    async def enqueue_upload_by_filename(self, filename: str, *, force: bool = True) -> SyncTask:
+        records = await self._history.search(query=filename, limit=10)
+        matched = next((r for r in records if r.filename == filename), None)
+        if matched is None:
+            arts = await self._agent.list_backups()
+            art = next((a for a in arts if a.filename == filename), None)
+            if art is None:
+                raise NotFound(f"Backup file '{filename}' not found on host agent")
+            matched = await self._history.create(
+                run_id=None,
+                guest_id=None,
+                vmid=art.vmid,
+                guest_type=art.guest_type,
+                guest_name=f"{art.guest_type.value.upper()} {art.vmid}",
+                node="server",
+                storage="hdd_3tb",
+                mode=BackupMode.SNAPSHOT,
+                compression=art.compression,
+                upload_status=UploadStatus.NOT_REQUIRED,
+                correlation_id=None,
+                started_at=art.created_at,
+            )
+            matched.filename = art.filename
+            matched.local_path = art.path
+            matched.size_bytes = art.size_bytes
+            matched.status = BackupStatus.SUCCESS.value
+            matched.finished_at = art.created_at
+            matched.checksum_sha256 = art.checksum_sha256
+            await self._history.flush()
+
+        return await self.enqueue_upload(matched.id, force=force)
 
     async def enqueue_pending(self) -> int:
         """Queue every successful backup still awaiting upload. Returns how many were added.
