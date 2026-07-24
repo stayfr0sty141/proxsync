@@ -574,11 +574,7 @@ def verify_csrf(request: Request) -> None:
     automatically by a browser, so it cannot be forged cross-site. Only the refresh cookie is
     ambient, so only the endpoints that consume it are guarded here.
     """
-    csrf_header = request.headers.get(CSRF_HEADER)
-    csrf_cookie = request.cookies.get(CSRF_COOKIE)
-    if not csrf_header and csrf_cookie and request.url.path.endswith("/auth/refresh"):
-        csrf_header = csrf_cookie
-    if not csrf_tokens_match(csrf_cookie, csrf_header):
+    if not csrf_tokens_match(request.cookies.get(CSRF_COOKIE), request.headers.get(CSRF_HEADER)):
         raise CsrfFailed("CSRF token missing or does not match. Reload the page and try again.")
 
 
