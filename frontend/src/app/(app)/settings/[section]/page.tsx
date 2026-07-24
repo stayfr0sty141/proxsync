@@ -134,16 +134,33 @@ function SectionForm({
         {Object.entries(values).map(([key, value]) => (
           <div key={key} className="flex flex-col gap-1.5">
             <Label htmlFor={key}>{humanise(key)}</Label>
-            <Input
-              id={key}
-              value={stringifyValue(value)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setValues((prev: Record<string, unknown>) => ({
-                  ...prev,
-                  [key]: coerce(value, e.target.value),
-                }))
-              }
-            />
+            {typeof value === "boolean" ? (
+              <select
+                id={key}
+                value={String(value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setValues((prev: Record<string, unknown>) => ({
+                    ...prev,
+                    [key]: e.target.value === "true",
+                  }))
+                }
+                className="flex h-9 w-full rounded-md border border-border-default bg-elevated px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            ) : (
+              <Input
+                id={key}
+                value={stringifyValue(value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setValues((prev: Record<string, unknown>) => ({
+                    ...prev,
+                    [key]: coerce(value, e.target.value),
+                  }))
+                }
+              />
+            )}
           </div>
         ))}
 
