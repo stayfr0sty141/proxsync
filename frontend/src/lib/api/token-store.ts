@@ -30,7 +30,12 @@ export const tokenStore = {
   },
 
   getCsrfToken(): string | null {
-    return csrfToken;
+    if (csrfToken) return csrfToken;
+    if (typeof document !== "undefined") {
+      const match = /(?:^|; )proxsync_csrf=([^;]*)/.exec(document.cookie);
+      if (match?.[1]) return decodeURIComponent(match[1]);
+    }
+    return null;
   },
 
   set(access: string, csrf: string): void {
