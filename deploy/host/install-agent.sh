@@ -875,7 +875,7 @@ port_is_available() {
     local port="$1"
     local old_port=""
     if [[ -f "$ENV_FILE" ]]; then
-        old_port="$(sed -n 's/^PROXSYNC_AGENT_BIND_PORT=["'\'']*\\([^"'\'']*\\).*/\\1/p' "$ENV_FILE" | head -1)"
+        old_port="$(sed -E -n 's/^PROXSYNC_AGENT_BIND_PORT=["'\'']*([^"'\'']*).*/\1/p' "$ENV_FILE" | head -1)"
     fi
     if [[ "$old_port" == "$port" ]] && systemctl is-active --quiet "$SERVICE"; then
         return 0
@@ -1168,7 +1168,7 @@ install_agent() {
         "$REGENERATE_ALL_SECRETS" "$REPAIR_PKI" "$ROTATE_SERVER_CERT"
 
     if [[ -f "$ENV_FILE" && "$REGENERATE_ALL_SECRETS" -eq 0 ]]; then
-        old_hmac="$(sed -n 's/^PROXSYNC_AGENT_HMAC_SECRET=["'\'']*\\([^"'\'']*\\).*/\\1/p' "$ENV_FILE" | head -1)"
+        old_hmac="$(sed -E -n 's/^PROXSYNC_AGENT_HMAC_SECRET=["'\'']*([^"'\'']*).*/\1/p' "$ENV_FILE" | head -1)"
     fi
     hmac_secret="$old_hmac"
     [[ -n "$hmac_secret" ]] || hmac_secret="$(openssl rand -hex 32)"
