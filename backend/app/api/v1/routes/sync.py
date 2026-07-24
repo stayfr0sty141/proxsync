@@ -41,6 +41,11 @@ MAX_PAGE_SIZE = 200
     status_code=status.HTTP_202_ACCEPTED,
     summary="Upload a backup to Google Drive",
 )
+@router.post(
+    "/sync/backups/{backup_id}/upload",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload a backup to Google Drive",
+)
 async def upload_backup(
     backup_id: int,
     payload: UploadRequest,
@@ -75,6 +80,11 @@ class UploadArtifactPayload(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     summary="Upload an artifact by filename to Google Drive",
 )
+@router.post(
+    "/sync/upload_artifact",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload an artifact by filename to Google Drive",
+)
 async def upload_artifact(
     payload: UploadArtifactPayload,
     service: SyncServiceDep,
@@ -100,6 +110,7 @@ async def upload_artifact(
 
 
 @router.post("/backups/{backup_id}/verify", summary="Compare a backup with its remote copy")
+@router.post("/sync/backups/{backup_id}/verify", summary="Compare a backup with its remote copy")
 async def verify_backup(
     backup_id: int,
     service: SyncServiceDep,
