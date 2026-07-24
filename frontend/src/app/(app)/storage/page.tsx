@@ -67,7 +67,7 @@ export default function StoragePage() {
                   <UsageBar
                     label="Google Drive"
                     usedBytes={d.remote.used_bytes}
-                    totalBytes={d.remote.total_bytes}
+                    totalBytes={d.remote.quota_bytes}
                   />
                   {d.storages.map((pool) => (
                     <UsageBar
