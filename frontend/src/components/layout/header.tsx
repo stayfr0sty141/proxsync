@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  * the signed-in user with password change and sign-out affordances. The bell count
  * reads the same `/notifications` pending figure the notifications page shows.
  */
-export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
+export function Header({ onToggleSidebar }: Readonly<{ onToggleSidebar: () => void }>) {
   const { user, logout } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { data: notifications } = useNotifications({ status: "pending", limit: 1 });
@@ -29,6 +29,8 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const pending = notifications?.pending ?? 0;
   const isDark = (resolvedTheme ?? theme) !== "light";
   const mustChangePassword = user?.must_change_password ?? false;
+
+  const bellAriaLabel = pending > 0 ? `Notifications, ${pending} pending` : "Notifications";
 
   return (
     <header className="flex h-14 items-center gap-3 border-b border-border-default bg-surface px-4">
@@ -52,7 +54,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
 
       <Link
         href="/notifications"
-        aria-label={`Notifications${pending > 0 ? `, ${pending} pending` : ""}`}
+        aria-label={bellAriaLabel}
       >
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="size-4" />
