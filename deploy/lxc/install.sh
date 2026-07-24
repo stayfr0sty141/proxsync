@@ -74,7 +74,7 @@ fi
 # ---- Directories -----------------------------------------------------------
 log "Creating directories"
 install -d -m 0755 "$INSTALL_ROOT"
-install -d -m 0750 "$CONFIG_DIR" "$TLS_DIR"
+install -d -o root -g "$SERVICE_USER" -m 0750 "$CONFIG_DIR" "$TLS_DIR"
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0750 "$STATE_DIR" "$LOG_DIR"
 install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 0700 "$BACKUP_DIR"
 
