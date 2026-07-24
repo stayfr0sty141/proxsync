@@ -24,9 +24,7 @@ import type {
  * payload: name, cron, timezone, mode, compression, storage, target selector
  * + guest list, retention and upload toggle.
  */
-export function CreateScheduleDialog({
-  onClose,
-}: Readonly<{ onClose: () => void }>) {
+export function CreateScheduleDialog({ onClose }: Readonly<{ onClose: () => void }>) {
   const guests = useGuests();
 
   // --- form state ---
@@ -44,8 +42,7 @@ export function CreateScheduleDialog({
   const [enabled, setEnabled] = useState(true);
 
   const create = useInvalidatingMutation(
-    (payload: BackupJobCreate) =>
-      api.post<BackupJobResponse>("/backup-jobs", payload),
+    (payload: BackupJobCreate) => api.post<BackupJobResponse>("/backup-jobs", payload),
     [queryDomains.jobs],
   );
 
@@ -131,10 +128,7 @@ export function CreateScheduleDialog({
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-fg-muted">Mode</span>
-          <Select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as BackupMode)}
-          >
+          <Select value={mode} onChange={(e) => setMode(e.target.value as BackupMode)}>
             <option value="snapshot">Snapshot (no downtime)</option>
             <option value="suspend">Suspend</option>
             <option value="stop">Stop</option>
@@ -197,12 +191,9 @@ export function CreateScheduleDialog({
                   className="size-4 accent-accent"
                 />
                 <span className="flex-1 text-sm text-fg-default">
-                  {g.name}{" "}
-                  <span className="text-fg-subtle">({g.vmid})</span>
+                  {g.name} <span className="text-fg-subtle">({g.vmid})</span>
                 </span>
-                <span className="text-xs uppercase text-fg-muted">
-                  {g.guest_type}
-                </span>
+                <span className="text-xs uppercase text-fg-muted">{g.guest_type}</span>
               </label>
             ))}
           </div>

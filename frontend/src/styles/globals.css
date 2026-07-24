@@ -84,6 +84,7 @@
   --color-border-muted: var(--border-muted);
 
   --color-fg: var(--fg-default);
+  --color-fg-default: var(--fg-default);
   --color-fg-muted: var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
 

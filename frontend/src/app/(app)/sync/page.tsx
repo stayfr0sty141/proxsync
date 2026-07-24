@@ -142,7 +142,8 @@ export default function SyncPage() {
                 </TableHeader>
                 <TableBody>
                   {d.items.map((t: SyncTaskResponse) => {
-                    const opName = t.operation || (t as unknown as Record<string, string>).direction || "upload";
+                    const opName =
+                      t.operation || (t as unknown as Record<string, string>).direction || "upload";
                     const sizeBytes = t.bytes_total ?? t.bytes_done;
 
                     return (
@@ -190,19 +191,19 @@ export default function SyncPage() {
                             className="text-xs text-fg-muted"
                           />
                         </TableCell>
-                      <TableCell>
-                        {t.status === "failed" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleRetry(t.id)}>
-                            Retry
-                          </Button>
-                        )}
-                        {(t.status === "queued" || t.status === "running") && (
-                          <Button variant="ghost" size="sm" onClick={() => handleCancel(t.id)}>
-                            Cancel
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                        <TableCell>
+                          {t.status === "failed" && (
+                            <Button variant="ghost" size="sm" onClick={() => handleRetry(t.id)}>
+                              Retry
+                            </Button>
+                          )}
+                          {(t.status === "queued" || t.status === "running") && (
+                            <Button variant="ghost" size="sm" onClick={() => handleCancel(t.id)}>
+                              Cancel
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>

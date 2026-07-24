@@ -32,10 +32,7 @@ export default function SchedulesPage() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <PageHeader
-          title="Schedules"
-          description="Automated backup jobs and when they next run"
-        />
+        <PageHeader title="Schedules" description="Automated backup jobs and when they next run" />
         <Button onClick={() => setShowCreate(true)}>+ New Schedule</Button>
       </div>
 
@@ -50,9 +47,7 @@ export default function SchedulesPage() {
         isEmpty={(d) => d.items.length === 0}
         emptyTitle="No schedules yet"
         emptyDescription="Create a backup job to run backups automatically on a cron schedule."
-        emptyAction={
-          <Button onClick={() => setShowCreate(true)}>+ New Schedule</Button>
-        }
+        emptyAction={<Button onClick={() => setShowCreate(true)}>+ New Schedule</Button>}
       >
         {(d) => (
           <Table>
@@ -118,10 +113,7 @@ export default function SchedulesPage() {
             }}
           >
             <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-              <h2
-                id="create-schedule-title"
-                className="text-base font-semibold text-fg-default"
-              >
+              <h2 id="create-schedule-title" className="text-base font-semibold text-fg-default">
                 New Schedule
               </h2>
               <button
