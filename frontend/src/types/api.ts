@@ -114,6 +114,11 @@ export interface InventorySyncResponse {
 
 export type TargetSelector = "all" | "include" | "exclude";
 
+export interface GuestTarget {
+  vmid: number;
+  guest_type: GuestType;
+}
+
 export interface BackupJobResponse {
   id: number;
   name: string;
@@ -125,7 +130,7 @@ export interface BackupJobResponse {
   zstd_threads: number;
   storage: string;
   target_selector: TargetSelector;
-  targets: number[];
+  targets: GuestTarget[];
   keep_local: number;
   keep_remote: number;
   upload_enabled: boolean;
@@ -149,7 +154,7 @@ export interface BackupJobCreate {
   zstd_threads?: number;
   storage: string;
   target_selector: TargetSelector;
-  targets: number[];
+  targets: GuestTarget[];
   keep_local: number;
   keep_remote: number;
   upload_enabled: boolean;
