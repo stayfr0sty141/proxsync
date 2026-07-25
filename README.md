@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/python-3.13%20%7C%203.11+-yellow?style=for-the-badge&logo=python)
 ![Status](https://img.shields.io/badge/status-M0--M9%20complete-success?style=for-the-badge)
 
-![ProxSync Logo](https://raw.githubusercontent.com/stayfr0sty141/proxsync/main/docs/assets/logo-dark.svg)
+![ProxSync Logo](docs/logo.png)
 
 **The batteries-included backup dashboard your Proxmox homelab deserves.**
 Schedule, replicate, retain, restore — all from a clean web UI, without compromising your hypervisor.
