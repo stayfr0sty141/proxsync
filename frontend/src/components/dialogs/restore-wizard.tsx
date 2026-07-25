@@ -195,7 +195,8 @@ function TargetStep({
             </option>
             {validBackups.map((b) => (
               <option key={b.id} value={b.id}>
-                #{b.id} - {b.filename} ({b.guest_name || `${b.guest_type.toUpperCase()} ${b.vmid}`} - {formatBytes(b.size_bytes)})
+                #{b.id} - {b.filename} ({b.guest_name || `${b.guest_type.toUpperCase()} ${b.vmid}`}{" "}
+                - {formatBytes(b.size_bytes)})
               </option>
             ))}
           </Select>

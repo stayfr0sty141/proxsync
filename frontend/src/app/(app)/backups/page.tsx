@@ -48,11 +48,7 @@ export default function BackupsPage() {
       <PageHeader
         title="Backups"
         description="Every backup artifact and its upload state"
-        actions={
-          <Button onClick={() => setShowBackupModal(true)}>
-            ⚡ Run Manual Backup
-          </Button>
-        }
+        actions={<Button onClick={() => setShowBackupModal(true)}>⚡ Run Manual Backup</Button>}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

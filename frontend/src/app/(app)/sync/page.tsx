@@ -105,7 +105,11 @@ export default function SyncPage() {
             loadingRows={1}
           >
             {(q) => (
-              <UsageBar label="Used of quota" usedBytes={q.used_bytes} totalBytes={q.quota_bytes ?? q.total_bytes} />
+              <UsageBar
+                label="Used of quota"
+                usedBytes={q.used_bytes}
+                totalBytes={q.quota_bytes ?? q.total_bytes}
+              />
             )}
           </DataState>
         </CardContent>

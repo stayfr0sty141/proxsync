@@ -52,10 +52,7 @@ export function Header({ onToggleSidebar }: Readonly<{ onToggleSidebar: () => vo
 
       <AgentStatusPill />
 
-      <Link
-        href="/notifications"
-        aria-label={bellAriaLabel}
-      >
+      <Link href="/notifications" aria-label={bellAriaLabel}>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="size-4" />
           {pending > 0 && (

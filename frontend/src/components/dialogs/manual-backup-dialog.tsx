@@ -236,7 +236,9 @@ export function ManualBackupDialog({ onClose }: Readonly<{ onClose: () => void }
         })}
         {filteredItems.length === 0 && (
           <p className="px-3 py-6 text-center text-xs text-fg-muted">
-            {guests.isLoading ? "Loading guests from Proxmox…" : "No guests match the search/filter."}
+            {guests.isLoading
+              ? "Loading guests from Proxmox…"
+              : "No guests match the search/filter."}
           </p>
         )}
       </div>
