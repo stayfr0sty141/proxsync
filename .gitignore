@@ -49,3 +49,4 @@ agent/.env
 backend/proxsync-dev.db
 backend/proxsync-dev.db-*
 /.dev/
+.vscode
