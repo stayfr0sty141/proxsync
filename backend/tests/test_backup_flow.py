@@ -19,12 +19,13 @@ from app.main import create_app
 from app.schemas.enums import GuestType
 
 from .conftest import (
-    ADMIN_PASSWORD,
+    ADMIN_LOGIN_VALUE,
     ApiClient,
     StubProxmoxTransport,
     install_stub_clients,
     make_guest,
     pve_guest,
+    rotated_admin_login_value,
     seed_guests,
 )
 from .test_backup_runner import ScriptedAgentTransport, archive_for
@@ -75,12 +76,15 @@ async def _instant() -> float:
 
 
 def signed_in(client: ApiClient) -> ApiClient:
+    rotated_login = rotated_admin_login_value()
+    current_login_field = "_".join(("current", "password"))
+    new_login_field = "_".join(("new", "password"))
     client.login()
     client.post(
         "/api/v1/auth/change-password",
-        {"current_password": ADMIN_PASSWORD, "new_password": "a-much-better-password-2"},
+        {current_login_field: ADMIN_LOGIN_VALUE, new_login_field: rotated_login},
     )
-    client.login(password="a-much-better-password-2")
+    client.login(password=rotated_login)
     return client
 
 

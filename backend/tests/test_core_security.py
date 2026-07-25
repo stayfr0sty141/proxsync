@@ -21,12 +21,12 @@ from app.core.security import (
     new_family_id,
 )
 
-ROOT_SECRET = "0123456789abcdef0123456789abcdef"
+ROOT_KEY_MATERIAL = "0123456789abcdef0123456789abcdef"  # noqa: S105
 
 
 def build_tokens(*, access_ttl: int = 900) -> TokenService:
     return TokenService(
-        signing_key=derive_jwt_key(ROOT_SECRET),
+        signing_key=derive_jwt_key(ROOT_KEY_MATERIAL),
         algorithm="HS256",
         issuer="proxsync",
         audience="proxsync-dashboard",
@@ -49,7 +49,10 @@ class TestPasswordService:
         assert not passwords.verify(digest, "wrong")
 
     def test_hashes_are_salted(self, passwords: PasswordService) -> None:
-        assert passwords.hash("same") != passwords.hash("same")
+        first_digest = passwords.hash("same")
+        second_digest = passwords.hash("same")
+
+        assert first_digest != second_digest
 
     def test_hash_is_argon2id(self, passwords: PasswordService) -> None:
         assert passwords.hash("x").startswith("$argon2id$")
@@ -93,6 +96,7 @@ class TestAccessTokens:
             tokens.decode_access_token(f"{head}.{payload}x.{signature}")
 
     def test_token_signed_with_another_key_is_rejected(self) -> None:
+        tokens = build_tokens()
         other = TokenService(
             signing_key=derive_jwt_key("f" * 32),
             algorithm="HS256",
@@ -103,7 +107,7 @@ class TestAccessTokens:
         )
         token, _ = other.create_access_token(user_id=1, username="mallory", role="admin")
         with pytest.raises(AuthenticationFailed):
-            build_tokens().decode_access_token(token)
+            tokens.decode_access_token(token)
 
     def test_wrong_audience_is_rejected(self) -> None:
         tokens = build_tokens()
@@ -116,7 +120,7 @@ class TestAccessTokens:
             "iss": "proxsync",
             "aud": "somewhere-else",
         }
-        forged = jwt.encode(payload, derive_jwt_key(ROOT_SECRET), algorithm="HS256")
+        forged = jwt.encode(payload, derive_jwt_key(ROOT_KEY_MATERIAL), algorithm="HS256")
         with pytest.raises(AuthenticationFailed):
             tokens.decode_access_token(forged)
 
@@ -131,7 +135,7 @@ class TestAccessTokens:
             "iss": "proxsync",
             "aud": "proxsync-dashboard",
         }
-        forged = jwt.encode(payload, derive_jwt_key(ROOT_SECRET), algorithm="HS256")
+        forged = jwt.encode(payload, derive_jwt_key(ROOT_KEY_MATERIAL), algorithm="HS256")
         with pytest.raises(AuthenticationFailed, match="not an access token"):
             tokens.decode_access_token(forged)
 
@@ -159,7 +163,10 @@ class TestRefreshTokens:
         assert first.raw not in first.digest  # the raw token is never recoverable from the row
 
     def test_family_ids_are_unique(self) -> None:
-        assert new_family_id() != new_family_id()
+        first_family_id = new_family_id()
+        second_family_id = new_family_id()
+
+        assert first_family_id != second_family_id
 
 
 class TestCsrf:
@@ -179,13 +186,18 @@ class TestCsrf:
 
 class TestKeyDerivation:
     def test_derivation_is_deterministic(self) -> None:
-        assert derive_key(ROOT_SECRET, b"a") == derive_key(ROOT_SECRET, b"a")
+        first_key = derive_key(ROOT_KEY_MATERIAL, b"a")
+        second_key = derive_key(ROOT_KEY_MATERIAL, b"a")
+
+        assert first_key == second_key
 
     def test_labels_produce_independent_keys(self) -> None:
-        assert derive_key(ROOT_SECRET, b"jwt") != derive_key(ROOT_SECRET, b"settings")
+        assert derive_key(ROOT_KEY_MATERIAL, b"jwt") != derive_key(
+            ROOT_KEY_MATERIAL, b"settings"
+        )
 
     def test_different_roots_produce_different_keys(self) -> None:
-        assert derive_key(ROOT_SECRET, b"a") != derive_key("f" * 32, b"a")
+        assert derive_key(ROOT_KEY_MATERIAL, b"a") != derive_key("f" * 32, b"a")
 
     def test_empty_root_is_refused(self) -> None:
         with pytest.raises(ConfigurationError):
@@ -194,24 +206,28 @@ class TestKeyDerivation:
 
 class TestSecretBox:
     def test_round_trip(self) -> None:
-        box = SecretBox(ROOT_SECRET)
+        box = SecretBox(ROOT_KEY_MATERIAL)
         assert box.decrypt(box.encrypt("123456:ABC-token")) == "123456:ABC-token"
 
     def test_ciphertext_hides_the_plaintext(self) -> None:
-        box = SecretBox(ROOT_SECRET)
+        box = SecretBox(ROOT_KEY_MATERIAL)
         assert "ABC-token" not in box.encrypt("123456:ABC-token")
 
     def test_encryption_is_non_deterministic(self) -> None:
-        box = SecretBox(ROOT_SECRET)
-        assert box.encrypt("same") != box.encrypt("same")
+        box = SecretBox(ROOT_KEY_MATERIAL)
+        first_ciphertext = box.encrypt("same")
+        second_ciphertext = box.encrypt("same")
+
+        assert first_ciphertext != second_ciphertext
 
     def test_another_root_secret_cannot_decrypt(self) -> None:
-        ciphertext = SecretBox(ROOT_SECRET).encrypt("secret")
+        ciphertext = SecretBox(ROOT_KEY_MATERIAL).encrypt("secret")
+        other_box = SecretBox("f" * 32)
         with pytest.raises(ConfigurationError, match="PROXSYNC_SECRET_KEY changed"):
-            SecretBox("f" * 32).decrypt(ciphertext)
+            other_box.decrypt(ciphertext)
 
     def test_hint_masks_all_but_the_tail(self) -> None:
-        box = SecretBox(ROOT_SECRET)
+        box = SecretBox(ROOT_KEY_MATERIAL)
         assert box.hint("123456789:ABCDEF") == "••••••CDEF"
         assert box.hint("ab") == "••"
 

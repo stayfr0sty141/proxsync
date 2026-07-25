@@ -36,6 +36,11 @@ def lsjson_payload(*, size: int, md5: str | None) -> str:
     return json.dumps([entry])
 
 
+def drive_md5_digest(data: bytes) -> str:
+    """Return the non-security MD5 checksum exposed by Google Drive/rclone metadata."""
+    return hashlib.new("md5", data, usedforsecurity=False).hexdigest()
+
+
 class TestUploadLifecycle:
     async def test_a_successful_upload_records_its_outcome(
         self,
@@ -144,7 +149,7 @@ class TestVerifyAfterUpload:
         artifact_factory: ArtifactFactory,
     ) -> None:
         path = artifact_factory(ARCHIVE, size=2048)
-        digest = hashlib.md5(path.read_bytes()).hexdigest()  # noqa: S324 - Drive publishes MD5
+        digest = drive_md5_digest(path.read_bytes())
         runner.output = RCLONE_UPLOAD_OUTPUT
         runner.capture_output = lsjson_payload(size=2048, md5=digest)
 
@@ -205,7 +210,7 @@ class TestVerification:
     ) -> None:
         """Re-verifying a 40 GiB artifact must not re-hash it every time."""
         path = artifact_factory(ARCHIVE, size=2048)
-        digest = hashlib.md5(path.read_bytes()).hexdigest()  # noqa: S324
+        digest = drive_md5_digest(path.read_bytes())
         runner.capture_output = lsjson_payload(size=2048, md5=digest)
         request = SyncVerifyRequest.model_validate(
             {"filename": ARCHIVE, "remote": "gdrive", "remote_path": "proxsync/dump"}

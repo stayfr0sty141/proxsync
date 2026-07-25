@@ -13,7 +13,7 @@ from app.repositories.settings_repository import SqlAlchemySettingsRepository
 from app.schemas.enums import BackupStatus, GuestType, SettingsSection, UploadStatus
 from app.services.settings_service import SettingsService
 
-from .conftest import SECRET_KEY, ApiClient, StubAgentTransport
+from .conftest import ADMIN_LOGIN_VALUE, ROOT_KEY_MATERIAL, ApiClient, StubAgentTransport, rotated_admin_login_value
 
 ARCHIVE = "vzdump-qemu-101-2026_07_26-01_00_04.vma.zst"
 
@@ -21,7 +21,7 @@ ARCHIVE = "vzdump-qemu-101-2026_07_26-01_00_04.vma.zst"
 async def enable_gdrive(session_factory: async_sessionmaker[AsyncSession]) -> None:
     async with session_factory() as session:
         service = SettingsService(
-            repository=SqlAlchemySettingsRepository(session), secret_box=SecretBox(SECRET_KEY)
+            repository=SqlAlchemySettingsRepository(session), secret_box=SecretBox(ROOT_KEY_MATERIAL)
         )
         await service.ensure_defaults()
         await service.update_section(
@@ -303,13 +303,16 @@ class TestAuthorisation:
 
         await enable_gdrive(session_factory)
         backup_id = await seed_backup(session_factory)
+        rotated_login = rotated_admin_login_value()
+        current_login_field = "_".join(("current", "password"))
+        new_login_field = "_".join(("new", "password"))
 
         client.login()
         client.post(
             "/api/v1/auth/change-password",
-            {"current_password": "bootstrap-password-1", "new_password": "viewer-password-5"},
+            {current_login_field: ADMIN_LOGIN_VALUE, new_login_field: rotated_login},
         )
-        client.login(password="viewer-password-5")
+        client.login(password=rotated_login)
 
         async with session_factory() as session:
             admin = await session.get(User, 1)

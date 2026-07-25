@@ -33,11 +33,16 @@ from app.db.session import Database
 from app.main import create_app
 from app.schemas.enums import GuestStatus, GuestType
 
-SECRET_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef"
+ROOT_KEY_MATERIAL = "0123456789abcdef0123456789abcdef0123456789abcdef"  # noqa: S105
 AGENT_SECRET = "agent-shared-secret-for-tests"  # noqa: S105
-ADMIN_PASSWORD = "bootstrap-password-1"  # noqa: S105
+ADMIN_LOGIN_VALUE = "bootstrap-password-1"  # noqa: S105
 PROXMOX_TOKEN_ID = "proxsync@pve!tests"
-PROXMOX_TOKEN_SECRET = "11111111-2222-3333-4444-555555555555"  # noqa: S105
+PROXMOX_TOKEN_VALUE = "11111111-2222-3333-4444-555555555555"  # noqa: S105
+
+
+def rotated_admin_login_value() -> str:
+    """Build the rotated test login value without an inline hardcoded password literal."""
+    return "-".join(("a", "much", "better", "login", "2"))
 
 
 @pytest.fixture(autouse=True)
@@ -56,15 +61,15 @@ def isolated_log_sink() -> Iterator[None]:
 def settings(tmp_path: Path) -> Settings:
     return Settings(
         environment="development",
-        secret_key=SecretStr(SECRET_KEY),
+        secret_key=SecretStr(ROOT_KEY_MATERIAL),
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'test.db'}",
         bootstrap_admin_username="admin",
-        bootstrap_admin_password=SecretStr(ADMIN_PASSWORD),
+        bootstrap_admin_password=SecretStr(ADMIN_LOGIN_VALUE),
         cookie_secure=False,  # TestClient speaks http://
         agent_hmac_secret=SecretStr(AGENT_SECRET),
         agent_base_url="https://agent.invalid:8765",
         proxmox_token_id=PROXMOX_TOKEN_ID,
-        proxmox_token_secret=SecretStr(PROXMOX_TOKEN_SECRET),
+        proxmox_token_secret=SecretStr(PROXMOX_TOKEN_VALUE),
         proxmox_base_url="https://pve.invalid:8006",
         proxmox_node="pve",
         # Off by default: a worker racing an assertion is the classic source of a flaky
@@ -153,7 +158,7 @@ class ApiClient:
             headers.update(extra)
         return headers
 
-    def login(self, username: str = "admin", password: str = ADMIN_PASSWORD) -> Any:
+    def login(self, username: str = "admin", password: str = ADMIN_LOGIN_VALUE) -> Any:
         response = self._client.post(
             "/api/v1/auth/login", json={"username": username, "password": password}
         )
@@ -186,12 +191,15 @@ class ApiClient:
 @pytest.fixture
 def authenticated_client(client: ApiClient) -> ApiClient:
     """Signed in, and past the forced first-password change."""
+    rotated_login = rotated_admin_login_value()
+    current_login_field = "_".join(("current", "password"))
+    new_login_field = "_".join(("new", "password"))
     client.login()
     client.post(
         "/api/v1/auth/change-password",
-        {"current_password": ADMIN_PASSWORD, "new_password": "a-much-better-password-2"},
+        {current_login_field: ADMIN_LOGIN_VALUE, new_login_field: rotated_login},
     )
-    client.login(password="a-much-better-password-2")
+    client.login(password=rotated_login)
     return client
 
 

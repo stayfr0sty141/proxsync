@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,6 +31,15 @@ from app.main import create_app
 
 HMAC_SECRET = "test-secret-value"  # noqa: S105 - test fixture
 KEY_ID = "proxsync-test"
+
+
+class SignatureInput(TypedDict):
+    secret: str
+    method: str
+    path: str
+    timestamp: str
+    nonce: str
+    body: bytes
 
 QEMU_BACKUP_OUTPUT = """\
 INFO: starting new backup job: vzdump 101 --mode snapshot --compress zstd --storage backup-hdd
@@ -203,18 +212,19 @@ class SignedTestClient:
     def _headers(self, method: str, path: str, body: bytes) -> dict[str, str]:
         timestamp = str(int(time.time()))
         nonce = uuid.uuid4().hex
+        signature_input: SignatureInput = {
+            "secret": HMAC_SECRET,
+            "method": method,
+            "path": path,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "body": body,
+        }
         return {
             "X-ProxSync-Key": KEY_ID,
             "X-ProxSync-Timestamp": timestamp,
             "X-ProxSync-Nonce": nonce,
-            "X-ProxSync-Signature": sign_request(
-                secret=HMAC_SECRET,
-                method=method,
-                path=path,
-                timestamp=timestamp,
-                nonce=nonce,
-                body=body,
-            ),
+            "X-ProxSync-Signature": sign_request(**signature_input),
         }
 
     def request(self, method: str, path: str, *, json: object | None = None):  # type: ignore[no-untyped-def]

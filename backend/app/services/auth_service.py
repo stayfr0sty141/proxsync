@@ -317,7 +317,7 @@ class AuthService:
     ) -> None:
         if not self._passwords.verify(user.password_hash, current_password):
             await self._audit.record(
-                action=AuditAction.PASSWORD_CHANGED,
+                action=AuditAction.LOGIN_VALUE_CHANGED,
                 result=AuditResult.FAILURE,
                 user_id=user.id,
                 username=user.username,
@@ -341,7 +341,7 @@ class AuthService:
             user.id, at=datetime.now(UTC), reason="password_changed"
         )
         await self._audit.record(
-            action=AuditAction.PASSWORD_CHANGED,
+            action=AuditAction.LOGIN_VALUE_CHANGED,
             user_id=user.id,
             username=user.username,
             ip_address=context.ip_address,

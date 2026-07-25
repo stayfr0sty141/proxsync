@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import time
+from typing import TypedDict
 
 import pytest
 
@@ -21,13 +22,30 @@ PATH = "/backup/start"
 BODY = b'{"vmid": 101}'
 
 
+class AuthenticatorInput(TypedDict):
+    key_id: str
+    secret: str
+    window_seconds: int
+    nonce_cache: NonceCache
+
+
+class SignatureInput(TypedDict):
+    secret: str
+    method: str
+    path: str
+    timestamp: str
+    nonce: str
+    body: bytes
+
+
 def build_authenticator(window: int = 60) -> RequestAuthenticator:
-    return RequestAuthenticator(
-        key_id=KEY_ID,
-        secret=SECRET,
-        window_seconds=window,
-        nonce_cache=NonceCache(ttl_seconds=window * 2, max_size=128),
-    )
+    authenticator_input: AuthenticatorInput = {
+        "key_id": KEY_ID,
+        "secret": SECRET,
+        "window_seconds": window,
+        "nonce_cache": NonceCache(ttl_seconds=window * 2, max_size=128),
+    }
+    return RequestAuthenticator(**authenticator_input)
 
 
 def headers_for(
@@ -41,13 +59,19 @@ def headers_for(
     key_id: str = KEY_ID,
 ) -> dict[str, str]:
     stamp = timestamp or str(int(time.time()))
+    signature_input: SignatureInput = {
+        "secret": secret,
+        "method": method,
+        "path": path,
+        "timestamp": stamp,
+        "nonce": nonce,
+        "body": body,
+    }
     return {
         "X-ProxSync-Key": key_id,
         "X-ProxSync-Timestamp": stamp,
         "X-ProxSync-Nonce": nonce,
-        "X-ProxSync-Signature": sign_request(
-            secret=secret, method=method, path=path, timestamp=stamp, nonce=nonce, body=body
-        ),
+        "X-ProxSync-Signature": sign_request(**signature_input),
     }
 
 

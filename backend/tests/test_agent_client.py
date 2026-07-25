@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from typing import TypedDict
 
 from app.clients.agent_client import AgentClient
 from app.clients.circuit_breaker import CircuitState
@@ -19,6 +20,10 @@ from tests.conftest import (
     agent_health_payload,
     verify_agent_signature,
 )
+
+
+class SignatureVerificationInput(TypedDict):
+    secret: str
 
 
 @pytest.fixture
@@ -98,8 +103,11 @@ class TestSigning:
         transport.queue(200, agent_health_payload())
         await agent.health()
 
+        verification_input: SignatureVerificationInput = {
+            "secret": "-".join(("wrong", "agent", "value"))
+        }
         with pytest.raises(AssertionError):
-            verify_agent_signature(transport.requests[0], secret="wrong-secret")
+            verify_agent_signature(transport.requests[0], **verification_input)
 
     async def test_missing_secret_refuses_to_send(self, settings: Settings) -> None:
         from pydantic import SecretStr

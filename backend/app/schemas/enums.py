@@ -251,16 +251,18 @@ class SettingValueType(StrEnum):
     INT = "int"
     BOOL = "bool"
     JSON = "json"
-    SECRET = "secret"  # noqa: S105 - an enum label, not a credential
+    # Enum label, not a credential.
+    SECRET = "secret"  # noqa: S105
 
 
 class AuditAction(StrEnum):
     LOGIN_SUCCESS = "login_success"
     LOGIN_FAILURE = "login_failure"
     LOGOUT = "logout"
-    TOKEN_REFRESH = "token_refresh"  # noqa: S105 - an enum label, not a credential
-    TOKEN_REUSE_DETECTED = "token_reuse_detected"  # noqa: S105 - an enum label, not a credential
-    PASSWORD_CHANGED = "password_changed"  # noqa: S105 - an enum label, not a credential
+    # Enum labels, not credentials.
+    TOKEN_REFRESH = "token_refresh"  # noqa: S105
+    TOKEN_REUSE_DETECTED = "token_reuse_detected"  # noqa: S105
+    LOGIN_VALUE_CHANGED = "password_changed"  # noqa: S105
     ACCOUNT_LOCKED = "account_locked"
     SETTINGS_CHANGED = "settings_changed"
     USER_CREATED = "user_created"

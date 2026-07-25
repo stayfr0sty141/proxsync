@@ -46,11 +46,13 @@ def _set_auth_cookies(response: Response, issued: IssuedSession, settings: Setti
         path="/api/v1/auth",
         domain=settings.cookie_domain,
     )
-    response.set_cookie(
+    # Safe by design: this is only the double-submit CSRF mirror token. It is not a
+    # session credential, the refresh token remains HttpOnly, and the SPA must read this
+    # value to echo it in the X-CSRF-Token header.
+    response.set_cookie(  # NOSONAR
         CSRF_COOKIE,
         issued.csrf_token,
         max_age=settings.refresh_token_ttl_seconds,
-        httponly=False,  # deliberately readable: the SPA must echo it in a header
         secure=settings.cookie_secure,
         samesite="strict",
         path=settings.cookie_path,

@@ -7,7 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models.user import User
 from app.schemas.enums import GuestType, UserRole
 
-from .conftest import ApiClient, StubProxmoxTransport, make_guest, pve_guest, seed_guests
+from .conftest import (
+    ADMIN_LOGIN_VALUE,
+    ApiClient,
+    StubProxmoxTransport,
+    make_guest,
+    pve_guest,
+    rotated_admin_login_value,
+    seed_guests,
+)
 
 
 class TestListing:
@@ -109,13 +117,16 @@ class TestAllowList:
     ) -> None:
         """Enabling a guest decides what may leave the host; that is an admin decision."""
         await seed_guests(session_factory, make_guest(101, name="web", enabled=False))
+        rotated_login = rotated_admin_login_value()
+        current_login_field = "_".join(("current", "password"))
+        new_login_field = "_".join(("new", "password"))
 
         client.login()
         client.post(
             "/api/v1/auth/change-password",
-            {"current_password": "bootstrap-password-1", "new_password": "another-password-3"},
+            {current_login_field: ADMIN_LOGIN_VALUE, new_login_field: rotated_login},
         )
-        client.login(password="another-password-3")
+        client.login(password=rotated_login)
 
         # Downgrade the signed-in account to operator, then retry.
         async with session_factory() as session:

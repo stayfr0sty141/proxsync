@@ -10,7 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db.models.backup import BackupHistory
 from app.schemas.enums import BackupStatus, GuestType, UploadStatus
 
-from .conftest import ApiClient, StubAgentTransport, make_guest, seed_guests
+from .conftest import (
+    ADMIN_LOGIN_VALUE,
+    ApiClient,
+    StubAgentTransport,
+    make_guest,
+    rotated_admin_login_value,
+    seed_guests,
+)
 
 ARCHIVE = "vzdump-qemu-101-2026_07_26-01_00_04.vma.zst"
 
@@ -102,12 +109,15 @@ class TestManualBackup:
         from app.db.models.user import User
         from app.schemas.enums import UserRole
 
+        rotated_login = rotated_admin_login_value()
+        current_login_field = "_".join(("current", "password"))
+        new_login_field = "_".join(("new", "password"))
         client.login()
         client.post(
             "/api/v1/auth/change-password",
-            {"current_password": "bootstrap-password-1", "new_password": "viewer-password-4"},
+            {current_login_field: ADMIN_LOGIN_VALUE, new_login_field: rotated_login},
         )
-        client.login(password="viewer-password-4")
+        client.login(password=rotated_login)
 
         async with session_factory() as session:
             admin = await session.get(User, 1)

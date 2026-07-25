@@ -10,6 +10,7 @@ venv/
 htmlcov/
 .coverage
 .coverage.*
+.venv-test/
 
 # ---- Node / Next --------------------------------------------------------
 node_modules/

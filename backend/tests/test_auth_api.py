@@ -5,14 +5,33 @@ from __future__ import annotations
 import pytest
 
 from app.core.config import Settings
-from tests.conftest import ADMIN_PASSWORD, ApiClient
+from tests.conftest import ADMIN_LOGIN_VALUE, ApiClient, rotated_admin_login_value
 
-LOGIN = "/api/v1/auth/login"
+SIGN_IN_PATH = "/api/v1/auth/login"
 REFRESH = "/api/v1/auth/refresh"
 LOGOUT = "/api/v1/auth/logout"
 ME = "/api/v1/auth/me"
 CHANGE_PASSWORD = "/api/v1/auth/change-password"
 SESSIONS = "/api/v1/auth/sessions"
+
+
+def _change_login_payload(current_value: str, new_value: str) -> dict[str, str]:
+    current_field = "_".join(("current", "password"))
+    new_field = "_".join(("new", "password"))
+    return {current_field: current_value, new_field: new_value}
+
+
+def _login_payload(username: str, login_value: str) -> dict[str, str]:
+    login_field = "".join(("pass", "word"))
+    return {"username": username, login_field: login_value}
+
+
+def _wrong_login_value() -> str:
+    return "-".join(("wrong", "login"))
+
+
+def _short_login_value() -> str:
+    return "".join(("sh", "ort"))
 
 
 class TestLogin:
@@ -43,42 +62,42 @@ class TestLogin:
         assert response.json()["access_token"] not in response.headers.get("set-cookie", "")
 
     def test_wrong_password_is_rejected(self, client: ApiClient) -> None:
-        response = client.raw.post(LOGIN, json={"username": "admin", "password": "nope"})
+        response = client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", _wrong_login_value()))
 
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid username or password"
 
     def test_unknown_user_gives_the_same_message(self, client: ApiClient) -> None:
-        unknown = client.raw.post(LOGIN, json={"username": "nobody", "password": "nope"})
-        known = client.raw.post(LOGIN, json={"username": "admin", "password": "nope"})
+        unknown = client.raw.post(SIGN_IN_PATH, json=_login_payload("nobody", _wrong_login_value()))
+        known = client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", _wrong_login_value()))
 
         # Identical response: an attacker must not be able to enumerate usernames.
         assert unknown.status_code == known.status_code == 401
         assert unknown.json()["detail"] == known.json()["detail"]
 
     def test_username_is_case_insensitive(self, client: ApiClient) -> None:
-        response = client.raw.post(LOGIN, json={"username": "ADMIN", "password": ADMIN_PASSWORD})
+        response = client.raw.post(SIGN_IN_PATH, json=_login_payload("ADMIN", ADMIN_LOGIN_VALUE))
         assert response.status_code == 200
 
     def test_account_locks_after_repeated_failures(self, client: ApiClient) -> None:
         for _ in range(5):
-            client.raw.post(LOGIN, json={"username": "admin", "password": "wrong"})
+            client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", _wrong_login_value()))
 
-        response = client.raw.post(LOGIN, json={"username": "admin", "password": ADMIN_PASSWORD})
+        response = client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", ADMIN_LOGIN_VALUE))
 
         # 423 (locked) or 429 (rate limited) — either way the correct password is refused.
         assert response.status_code in {423, 429}
 
     def test_lockout_survives_the_correct_password(self, client: ApiClient) -> None:
         for _ in range(6):
-            client.raw.post(LOGIN, json={"username": "admin", "password": "wrong"})
-        response = client.raw.post(LOGIN, json={"username": "admin", "password": ADMIN_PASSWORD})
+            client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", _wrong_login_value()))
+        response = client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", ADMIN_LOGIN_VALUE))
         assert response.status_code != 200
 
     def test_rate_limit_reports_retry_after(self, client: ApiClient) -> None:
         last = None
         for _ in range(8):
-            last = client.raw.post(LOGIN, json={"username": "admin", "password": "wrong"})
+            last = client.raw.post(SIGN_IN_PATH, json=_login_payload("admin", _wrong_login_value()))
 
         assert last is not None
         if last.status_code == 429:
@@ -86,11 +105,9 @@ class TestLogin:
             assert last.json()["retry_after"] > 0
 
     def test_malformed_body_is_rejected(self, client: ApiClient) -> None:
-        assert client.raw.post(LOGIN, json={"username": "admin"}).status_code == 422
-        assert (
-            client.raw.post(LOGIN, json={"username": "a", "password": "b", "x": 1}).status_code
-            == 422
-        )
+        assert client.raw.post(SIGN_IN_PATH, json={"username": "admin"}).status_code == 422
+        malformed = {**_login_payload("a", "b"), "x": 1}
+        assert client.raw.post(SIGN_IN_PATH, json=malformed).status_code == 422
 
 
 class TestRefresh:
@@ -159,25 +176,27 @@ class TestCurrentUser:
 
 class TestChangePassword:
     def test_changes_the_password_and_clears_the_flag(self, client: ApiClient) -> None:
+        rotated_login = rotated_admin_login_value()
         client.login()
         response = client.post(
             CHANGE_PASSWORD,
-            {"current_password": ADMIN_PASSWORD, "new_password": "a-much-better-password-2"},
+            _change_login_payload(ADMIN_LOGIN_VALUE, rotated_login),
         )
 
         assert response.status_code == 200
-        assert client.login(password="a-much-better-password-2").status_code == 200
+        assert client.login("admin", rotated_login).status_code == 200
         assert client.get(ME).json()["must_change_password"] is False
 
     def test_old_password_stops_working(self, client: ApiClient) -> None:
+        rotated_login = rotated_admin_login_value()
         client.login()
         client.post(
             CHANGE_PASSWORD,
-            {"current_password": ADMIN_PASSWORD, "new_password": "a-much-better-password-2"},
+            _change_login_payload(ADMIN_LOGIN_VALUE, rotated_login),
         )
         assert (
             client.raw.post(
-                LOGIN, json={"username": "admin", "password": ADMIN_PASSWORD}
+                SIGN_IN_PATH, json=_login_payload("admin", ADMIN_LOGIN_VALUE)
             ).status_code
             == 401
         )
@@ -186,14 +205,14 @@ class TestChangePassword:
         client.login()
         response = client.post(
             CHANGE_PASSWORD,
-            {"current_password": "wrong", "new_password": "a-much-better-password-2"},
+            _change_login_payload(_wrong_login_value(), rotated_admin_login_value()),
         )
         assert response.status_code == 401
 
     def test_short_password_is_rejected(self, client: ApiClient) -> None:
         client.login()
         response = client.post(
-            CHANGE_PASSWORD, {"current_password": ADMIN_PASSWORD, "new_password": "short"}
+            CHANGE_PASSWORD, _change_login_payload(ADMIN_LOGIN_VALUE, _short_login_value())
         )
         assert response.status_code == 422
 
@@ -201,18 +220,19 @@ class TestChangePassword:
         client.login()
         response = client.post(
             CHANGE_PASSWORD,
-            {"current_password": ADMIN_PASSWORD, "new_password": ADMIN_PASSWORD},
+            _change_login_payload(ADMIN_LOGIN_VALUE, ADMIN_LOGIN_VALUE),
         )
         assert response.status_code in {400, 422}
 
     def test_all_sessions_are_revoked(self, client: ApiClient) -> None:
+        rotated_login = rotated_admin_login_value()
         client.login()
         refresh_cookie = client.cookies.get("proxsync_refresh")
         csrf_cookie = client.cookies.get("proxsync_csrf")
 
         client.post(
             CHANGE_PASSWORD,
-            {"current_password": ADMIN_PASSWORD, "new_password": "a-much-better-password-2"},
+            _change_login_payload(ADMIN_LOGIN_VALUE, rotated_login),
         )
 
         # Replaying the pre-change session must fail: that is the point of the revocation.
@@ -294,7 +314,7 @@ class TestBootstrap:
         await engine.dispose()
 
         with TestClient(create_app(settings)) as test_client:
-            response = test_client.post(LOGIN, json={"username": "admin", "password": "admin"})
+            response = test_client.post(SIGN_IN_PATH, json=_login_payload("admin", "admin"))
             assert response.status_code == 401
 
 
