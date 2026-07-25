@@ -37,7 +37,7 @@ def _infer_value_type(value: Any) -> SettingValueType:
         return SettingValueType.BOOL
     if isinstance(value, int):
         return SettingValueType.INT
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         return SettingValueType.JSON
     return SettingValueType.STRING
 
@@ -197,22 +197,7 @@ class SettingsService:
             defaults = self._section_defaults(section, model_cls, timezone)
 
             if section is SettingsSection.RETENTION:
-                upload_guard = next(
-                    (row for row in rows if row.key == "require_upload_before_delete"), None
-                )
-                if upload_guard is not None and unwrap(upload_guard.value) is not True:
-                    await self._persist_field(
-                        section,
-                        "require_upload_before_delete",
-                        True,
-                        is_secret=False,
-                        updated_by=None,
-                    )
-                    written += 1
-                    logger.warning(
-                        "unsafe_retention_setting_normalized",
-                        field="require_upload_before_delete",
-                    )
+                written += await self._normalize_retention_guard(section, rows)
 
             for field, value in defaults.items():
                 if field in existing:
@@ -230,6 +215,33 @@ class SettingsService:
         if written:
             logger.info("settings_defaults_seeded", count=written)
         return written
+
+    async def _normalize_retention_guard(
+        self, section: SettingsSection, rows: list[Setting]
+    ) -> int:
+        """Repair the retired unsafe value for the upload-before-delete guard.
+
+        M5 turned this into a hard safety invariant; a legacy `False` is normalised to `True`
+        so upgrades stay bootable without ever running retention unsafely. Returns the number
+        of fields written (0 or 1) so the caller can keep its running total.
+        """
+        upload_guard = next(
+            (row for row in rows if row.key == "require_upload_before_delete"), None
+        )
+        if upload_guard is None or unwrap(upload_guard.value) is True:
+            return 0
+        await self._persist_field(
+            section,
+            "require_upload_before_delete",
+            True,
+            is_secret=False,
+            updated_by=None,
+        )
+        logger.warning(
+            "unsafe_retention_setting_normalized",
+            field="require_upload_before_delete",
+        )
+        return 1
 
     @staticmethod
     def _section_defaults(

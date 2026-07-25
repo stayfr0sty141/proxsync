@@ -135,7 +135,6 @@ async def test_a_disabled_event_writes_no_row(session: AsyncSession) -> None:
         )
         is None
     )
-    assert await service.list() == await service.list()
     assert (await service.list()).total == 0
 
 
@@ -477,18 +476,20 @@ async def test_send_test_refuses_without_a_token(
 ) -> None:
     """A request problem, not a delivery result: there is nothing to attempt."""
     await configure(session, bot_token="")
+    service = build(session, telegram=telegram)
 
     with pytest.raises(ValidationFailed, match="bot token"):
-        await build(session, telegram=telegram).send_test()
+        await service.send_test()
 
 
 async def test_send_test_refuses_without_a_chat_id(
     session: AsyncSession, telegram: RecordingTelegram
 ) -> None:
     await configure(session, chat_id="")
+    service = build(session, telegram=telegram)
 
     with pytest.raises(ValidationFailed, match="chat id"):
-        await build(session, telegram=telegram).send_test()
+        await service.send_test()
 
 
 async def test_the_bot_token_is_never_stored_in_the_outbox_payload(

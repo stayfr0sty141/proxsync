@@ -26,6 +26,7 @@ from app.schemas.agent import (
 )
 from app.schemas.enums import (
     BackupStatus,
+    Compression,
     GuestStatus,
     GuestType,
     RestoreMode,
@@ -105,7 +106,7 @@ def local_artifact(*, checksum: str | None = CHECKSUM) -> AgentArtifact:
         size_bytes=SIZE,
         created_at=datetime(2026, 7, 26, 1, tzinfo=UTC),
         modified_at=datetime(2026, 7, 26, 1, 12, tzinfo=UTC),
-        compression="zstd",
+        compression=Compression.ZSTD,
         checksum_sha256=checksum,
     )
 
@@ -219,10 +220,10 @@ class TestPreflight:
     ) -> None:
         await seed_defaults(session_factory)
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreRequest(backup_id=9999, target_vmid=151)
             with pytest.raises(NotFound):
-                await build_service(session, agent).preflight(
-                    RestoreRequest(backup_id=9999, target_vmid=151)
-                )
+                await service.preflight(request)
 
     async def test_an_unsuccessful_backup_is_not_a_restore_source(
         self, session_factory: async_sessionmaker[AsyncSession], agent: FakeRestoreAgent
@@ -525,13 +526,12 @@ class TestCreate:
         backup_id = await seed_backup(session_factory, status=BackupStatus.FAILED)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreRequest(
+                backup_id=backup_id, target_vmid=151, target_storage="local-lvm"
+            )
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session, agent).create(
-                    RestoreRequest(
-                        backup_id=backup_id, target_vmid=151, target_storage="local-lvm"
-                    ),
-                    requested_by=None,
-                )
+                await service.create(request, requested_by=None)
             await session.rollback()
 
         assert "preflight" in excinfo.value.extra
@@ -572,11 +572,10 @@ class TestConfirm:
         restore_id, _ = await create_pending(session_factory, agent)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreConfirmRequest(confirmation_token="rst_wrong-token", target_vmid=151)
             with pytest.raises(ValidationFailed):
-                await build_service(session, agent).confirm(
-                    restore_id,
-                    RestoreConfirmRequest(confirmation_token="rst_wrong-token", target_vmid=151),
-                )
+                await service.confirm(restore_id, request)
 
     async def test_a_wrong_vmid_is_refused_even_with_the_right_token(
         self, session_factory: async_sessionmaker[AsyncSession], agent: FakeRestoreAgent
@@ -585,11 +584,10 @@ class TestConfirm:
         restore_id, token = await create_pending(session_factory, agent)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreConfirmRequest(confirmation_token=token, target_vmid=999)
             with pytest.raises(ValidationFailed):
-                await build_service(session, agent).confirm(
-                    restore_id,
-                    RestoreConfirmRequest(confirmation_token=token, target_vmid=999),
-                )
+                await service.confirm(restore_id, request)
 
     async def test_a_token_cannot_be_replayed(
         self, session_factory: async_sessionmaker[AsyncSession], agent: FakeRestoreAgent
@@ -604,10 +602,10 @@ class TestConfirm:
             await session.commit()
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
             with pytest.raises(Conflict):
-                await build_service(session, agent).confirm(
-                    restore_id, RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
-                )
+                await service.confirm(restore_id, request)
 
     async def test_an_expired_window_refuses_even_with_a_valid_token(
         self, session_factory: async_sessionmaker[AsyncSession], agent: FakeRestoreAgent
@@ -624,10 +622,10 @@ class TestConfirm:
             await session.commit()
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
             with pytest.raises(Conflict):
-                await build_service(session, agent).confirm(
-                    restore_id, RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
-                )
+                await service.confirm(restore_id, request)
             await session.commit()
 
         async with session_factory() as session:
@@ -654,10 +652,10 @@ class TestConfirm:
         agent.artifacts = []  # the archive was deleted while the dialog was open
 
         async with session_factory() as session:
+            service = build_service(session, agent)
+            request = RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
             with pytest.raises(Conflict) as excinfo:
-                await build_service(session, agent).confirm(
-                    restore_id, RestoreConfirmRequest(confirmation_token=token, target_vmid=151)
-                )
+                await service.confirm(restore_id, request)
             await session.rollback()
 
         assert "backup_present_locally" in str(excinfo.value.detail)
@@ -690,8 +688,9 @@ class TestCancelAndExpiry:
         restore_id = await seed_restore(session_factory, backup_id, status=RestoreStatus.RUNNING)
 
         async with session_factory() as session:
+            service = build_service(session, agent)
             with pytest.raises(Conflict):
-                await build_service(session, agent).cancel(restore_id)
+                await service.cancel(restore_id)
 
     async def test_expire_stale_closes_abandoned_windows(
         self, session_factory: async_sessionmaker[AsyncSession], agent: FakeRestoreAgent

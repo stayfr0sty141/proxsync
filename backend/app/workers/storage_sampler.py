@@ -250,16 +250,10 @@ class StorageSampler:
     def _create_artifact_history_record(
         art: Any, node_name: str, guest_obj: Any | None
     ) -> BackupHistory:
-        guest_name = (
-            guest_obj.name
-            if guest_obj
-            else f"{art.guest_type.value.upper()} {art.vmid}"
-        )
+        guest_name = guest_obj.name if guest_obj else f"{art.guest_type.value.upper()} {art.vmid}"
         guest_id = guest_obj.id if guest_obj else None
         comp_val = (
-            art.compression.value
-            if hasattr(art.compression, "value")
-            else str(art.compression)
+            art.compression.value if hasattr(art.compression, "value") else str(art.compression)
         )
         return BackupHistory(
             vmid=art.vmid,

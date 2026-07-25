@@ -37,6 +37,12 @@ from app.schemas.enums import (
     UploadStatus,
 )
 
+# FK targets and ondelete actions repeated across the models below; named once so a change
+# lands in a single place and to satisfy the duplicate-literal check.
+_USERS_ID = "users.id"
+_BACKUP_HISTORY_ID = "backup_history.id"
+_ON_DELETE_SET_NULL = "SET NULL"
+
 
 class BackupJob(IdMixin, TimestampMixin, Base):
     __tablename__ = "backup_jobs"
@@ -77,7 +83,7 @@ class BackupJob(IdMixin, TimestampMixin, Base):
     last_run_at: Mapped[datetime | None] = mapped_column(default=None)
     next_run_at: Mapped[datetime | None] = mapped_column(default=None, index=True)
     created_by: Mapped[int | None] = mapped_column(
-        BigIntForeignKey, ForeignKey("users.id", ondelete="SET NULL"), default=None
+        BigIntForeignKey, ForeignKey(_USERS_ID, ondelete=_ON_DELETE_SET_NULL), default=None
     )
 
     targets: Mapped[list[BackupJobTarget]] = relationship(
@@ -113,14 +119,14 @@ class BackupRun(IdMixin, Base):
 
     job_id: Mapped[int | None] = mapped_column(
         BigIntForeignKey,
-        ForeignKey("backup_jobs.id", ondelete="SET NULL"),
+        ForeignKey("backup_jobs.id", ondelete=_ON_DELETE_SET_NULL),
         default=None,
         index=True,
     )
     trigger: Mapped[str] = mapped_column(String(16), default=TriggerType.MANUAL.value)
     status: Mapped[str] = mapped_column(String(32), default=RunStatus.QUEUED.value)
     requested_by: Mapped[int | None] = mapped_column(
-        BigIntForeignKey, ForeignKey("users.id", ondelete="SET NULL"), default=None
+        BigIntForeignKey, ForeignKey(_USERS_ID, ondelete=_ON_DELETE_SET_NULL), default=None
     )
 
     guest_total: Mapped[int] = mapped_column(Integer, default=0)
@@ -169,12 +175,12 @@ class BackupHistory(IdMixin, TimestampMixin, Base):
 
     run_id: Mapped[int | None] = mapped_column(
         BigIntForeignKey,
-        ForeignKey("backup_runs.id", ondelete="SET NULL"),
+        ForeignKey("backup_runs.id", ondelete=_ON_DELETE_SET_NULL),
         default=None,
         index=True,
     )
     guest_id: Mapped[int | None] = mapped_column(
-        BigIntForeignKey, ForeignKey("guests.id", ondelete="SET NULL"), default=None
+        BigIntForeignKey, ForeignKey("guests.id", ondelete=_ON_DELETE_SET_NULL), default=None
     )
 
     # Denormalised so history survives the guest being deleted from Proxmox.
@@ -229,7 +235,7 @@ class SyncTask(IdMixin, Base):
 
     backup_id: Mapped[int | None] = mapped_column(
         BigIntForeignKey,
-        ForeignKey("backup_history.id", ondelete="CASCADE"),
+        ForeignKey(_BACKUP_HISTORY_ID, ondelete="CASCADE"),
         default=None,
         index=True,
     )
@@ -273,7 +279,7 @@ class RestoreHistory(IdMixin, Base):
     )
 
     backup_id: Mapped[int] = mapped_column(
-        BigIntForeignKey, ForeignKey("backup_history.id", ondelete="RESTRICT"), index=True
+        BigIntForeignKey, ForeignKey(_BACKUP_HISTORY_ID, ondelete="RESTRICT"), index=True
     )
     source: Mapped[str] = mapped_column(String(16), default=RestoreSource.LOCAL.value)
 
@@ -297,7 +303,7 @@ class RestoreHistory(IdMixin, Base):
 
     agent_task_id: Mapped[str | None] = mapped_column(String(64), default=None, index=True)
     requested_by: Mapped[int | None] = mapped_column(
-        BigIntForeignKey, ForeignKey("users.id", ondelete="SET NULL"), default=None
+        BigIntForeignKey, ForeignKey(_USERS_ID, ondelete=_ON_DELETE_SET_NULL), default=None
     )
 
     started_at: Mapped[datetime | None] = mapped_column(default=None)
@@ -323,7 +329,7 @@ class RetentionEvent(IdMixin, Base):
     )
 
     backup_id: Mapped[int | None] = mapped_column(
-        BigIntForeignKey, ForeignKey("backup_history.id", ondelete="SET NULL"), default=None
+        BigIntForeignKey, ForeignKey(_BACKUP_HISTORY_ID, ondelete=_ON_DELETE_SET_NULL), default=None
     )
     vmid: Mapped[int] = mapped_column(Integer)
     guest_type: Mapped[str] = mapped_column(String(8))

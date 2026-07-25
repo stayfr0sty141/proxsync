@@ -38,7 +38,7 @@ class PveGuest(BaseModel):
     @classmethod
     def _coerce_template(cls, value: Any) -> Any:
         # PVE sends 0/1, not a JSON boolean.
-        return bool(int(value)) if isinstance(value, (int, str)) and str(value).isdigit() else value
+        return bool(int(value)) if isinstance(value, int | str) and str(value).isdigit() else value
 
     @property
     def status_enum(self) -> GuestStatus:

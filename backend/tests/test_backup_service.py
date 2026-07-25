@@ -188,10 +188,10 @@ class TestManualTargets:
         """Otherwise the allow-list is decorative: anyone could copy a guest policy forbids."""
         del seeded_guests
         async with session_factory() as session:
+            service = build_service(session)
+            targets = [GuestTarget(vmid=103, guest_type=GuestType.VM)]
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session).resolve_explicit_targets(
-                    [GuestTarget(vmid=103, guest_type=GuestType.VM)]
-                )
+                await service.resolve_explicit_targets(targets)
 
         problems = excinfo.value.extra["problems"]
         assert "not enabled for backup" in problems[0]
@@ -203,13 +203,13 @@ class TestManualTargets:
         """A partial backup that silently dropped a guest is worse than a 400."""
         del seeded_guests
         async with session_factory() as session:
+            service = build_service(session)
+            targets = [
+                GuestTarget(vmid=101, guest_type=GuestType.VM),
+                GuestTarget(vmid=999, guest_type=GuestType.VM),
+            ]
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session).resolve_explicit_targets(
-                    [
-                        GuestTarget(vmid=101, guest_type=GuestType.VM),
-                        GuestTarget(vmid=999, guest_type=GuestType.VM),
-                    ]
-                )
+                await service.resolve_explicit_targets(targets)
         assert len(excinfo.value.extra["problems"]) == 1
 
     async def test_unknown_guest_names_itself_in_the_error(
@@ -217,10 +217,10 @@ class TestManualTargets:
     ) -> None:
         del seeded_guests
         async with session_factory() as session:
+            service = build_service(session)
+            targets = [GuestTarget(vmid=777, guest_type=GuestType.LXC)]
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session).resolve_explicit_targets(
-                    [GuestTarget(vmid=777, guest_type=GuestType.LXC)]
-                )
+                await service.resolve_explicit_targets(targets)
         assert "lxc 777" in excinfo.value.extra["problems"][0]
 
 
@@ -323,10 +323,9 @@ class TestRunCreation:
         async with session_factory() as session:
             job = await SqlAlchemyBackupJobRepository(session).get(job_id)
             assert job is not None
+            service = build_service(session)
             with pytest.raises(ValidationFailed) as excinfo:
-                await build_service(session).request_job_run(
-                    job, trigger=TriggerType.SCHEDULE, requested_by=None
-                )
+                await service.request_job_run(job, trigger=TriggerType.SCHEDULE, requested_by=None)
 
         assert "resolves to no guests" in excinfo.value.detail
         assert excinfo.value.extra["skipped"]
@@ -349,10 +348,9 @@ class TestRunCreation:
         async with session_factory() as session:
             job = await SqlAlchemyBackupJobRepository(session).get(job_id)
             assert job is not None
+            service = build_service(session)
             with pytest.raises(Conflict) as excinfo:
-                await build_service(session).request_job_run(
-                    job, trigger=TriggerType.SCHEDULE, requested_by=None
-                )
+                await service.request_job_run(job, trigger=TriggerType.SCHEDULE, requested_by=None)
 
         assert "already has run" in excinfo.value.detail
 

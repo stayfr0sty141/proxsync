@@ -100,7 +100,8 @@ class Database:
         try:
             async with self._engine.connect() as connection:
                 await connection.execute(text("SELECT 1"))
-        except Exception:  # noqa: BLE001 - health checks report, they do not raise
+        # A broad catch is intentional: a health check reports failure, it does not raise.
+        except Exception:  # noqa: BLE001
             logger.error("database_check_failed", exc_info=True)
             return False
         return True

@@ -228,9 +228,11 @@ class TestManualBackupEndToEnd:
         await wait_for_run(client, run_id, status="success")
 
         [backup] = client.get(f"/api/v1/runs/{run_id}/backups").json()["items"]
-        assert backup["upload_status"] in {"pending", "uploading", "uploaded"}, (
-            "a run that asked for an upload must leave the artifact queued for one"
-        )
+        assert backup["upload_status"] in {
+            "pending",
+            "uploading",
+            "uploaded",
+        }, "a run that asked for an upload must leave the artifact queued for one"
 
         deadline = asyncio.get_running_loop().time() + POLL_TIMEOUT_SECONDS
         while asyncio.get_running_loop().time() < deadline:

@@ -249,11 +249,11 @@ def _jsonable(value: Any) -> Any:
     Anything exotic becomes its `repr`, truncated. A log line is diagnostic text; refusing to
     store it because one field held a socket object would be the wrong trade.
     """
-    if value is None or isinstance(value, (bool, int, float)):
+    if value is None or isinstance(value, bool | int | float):
         return value
     if isinstance(value, str):
         return value[:MAX_CONTEXT_VALUE_LENGTH]
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return [_jsonable(item) for item in value[:20]]
     if isinstance(value, dict):
         return {str(key): _jsonable(item) for key, item in list(value.items())[:20]}

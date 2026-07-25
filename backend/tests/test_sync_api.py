@@ -13,7 +13,13 @@ from app.repositories.settings_repository import SqlAlchemySettingsRepository
 from app.schemas.enums import BackupStatus, GuestType, SettingsSection, UploadStatus
 from app.services.settings_service import SettingsService
 
-from .conftest import ADMIN_LOGIN_VALUE, ROOT_KEY_MATERIAL, ApiClient, StubAgentTransport, rotated_admin_login_value
+from .conftest import (
+    ADMIN_LOGIN_VALUE,
+    ROOT_KEY_MATERIAL,
+    ApiClient,
+    StubAgentTransport,
+    rotated_admin_login_value,
+)
 
 ARCHIVE = "vzdump-qemu-101-2026_07_26-01_00_04.vma.zst"
 
@@ -21,7 +27,8 @@ ARCHIVE = "vzdump-qemu-101-2026_07_26-01_00_04.vma.zst"
 async def enable_gdrive(session_factory: async_sessionmaker[AsyncSession]) -> None:
     async with session_factory() as session:
         service = SettingsService(
-            repository=SqlAlchemySettingsRepository(session), secret_box=SecretBox(ROOT_KEY_MATERIAL)
+            repository=SqlAlchemySettingsRepository(session),
+            secret_box=SecretBox(ROOT_KEY_MATERIAL),
         )
         await service.ensure_defaults()
         await service.update_section(

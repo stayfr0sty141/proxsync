@@ -342,9 +342,9 @@ class TestHappyPath:
         paths = [r.url.path for r in scripted.requests]
         first_start = paths.index("/backup/start")
         second_start = paths.index("/backup/start", first_start + 1)
-        assert "/task/task-1" in paths[first_start:second_start], (
-            "the first backup must reach a terminal state before the second starts"
-        )
+        assert (
+            "/task/task-1" in paths[first_start:second_start]
+        ), "the first backup must reach a terminal state before the second starts"
 
     async def test_upload_is_pending_only_when_the_run_asked_for_it(
         self, runner: BackupRunner, database: Database, scripted: ScriptedAgentTransport
@@ -578,9 +578,9 @@ class TestRecovery:
 
         await runner._execute_run(run_id)  # noqa: SLF001
 
-        assert [start["vmid"] for start in scripted.started_backups] == [201], (
-            "the guest already backed up must not be backed up again"
-        )
+        assert [start["vmid"] for start in scripted.started_backups] == [
+            201
+        ], "the guest already backed up must not be backed up again"
         records = await history_for(database, run_id)
         assert len(records) == 2
 

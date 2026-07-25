@@ -39,6 +39,10 @@ ADMIN_LOGIN_VALUE = "bootstrap-password-1"  # noqa: S105
 PROXMOX_TOKEN_ID = "proxsync@pve!tests"
 PROXMOX_TOKEN_VALUE = "11111111-2222-3333-4444-555555555555"  # noqa: S105
 
+# Backwards-compatible aliases: most of the suite still imports these older names.
+SECRET_KEY = ROOT_KEY_MATERIAL
+PROXMOX_TOKEN_SECRET = PROXMOX_TOKEN_VALUE
+
 
 def rotated_admin_login_value() -> str:
     """Build the rotated test login value without an inline hardcoded password literal."""
@@ -326,9 +330,9 @@ def verify_agent_signature(recorded: RecordedRequest, *, secret: str = AGENT_SEC
         f"{hashlib.sha256(recorded.content).hexdigest()}"
     )
     expected = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
-    assert hmac.compare_digest(expected, recorded.headers["x-proxsync-signature"]), (
-        "agent signature does not verify"
-    )
+    assert hmac.compare_digest(
+        expected, recorded.headers["x-proxsync-signature"]
+    ), "agent signature does not verify"
     assert abs(time.time() - float(timestamp)) < 60, "timestamp outside the agent's window"
     assert len(nonce) >= 8
 

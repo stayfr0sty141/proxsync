@@ -52,7 +52,7 @@ def human_duration(seconds: float | None) -> str:
 
 def human_percent(value: Any) -> str:
     """One decimal, always. `87.99999%` in an alert reads as a bug in the alerting."""
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
+    if isinstance(value, int | float) and not isinstance(value, bool):
         return f"{float(value):.1f}%"
     return esc(value)
 

@@ -41,6 +41,7 @@ class SignatureInput(TypedDict):
     nonce: str
     body: bytes
 
+
 QEMU_BACKUP_OUTPUT = """\
 INFO: starting new backup job: vzdump 101 --mode snapshot --compress zstd --storage backup-hdd
 INFO: Starting Backup of VM 101 (qemu)

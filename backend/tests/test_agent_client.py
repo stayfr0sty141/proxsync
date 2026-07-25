@@ -6,9 +6,10 @@ own helper, so a change on either side of the contract fails here.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 import httpx
 import pytest
-from typing import TypedDict
 
 from app.clients.agent_client import AgentClient
 from app.clients.circuit_breaker import CircuitState

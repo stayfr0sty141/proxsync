@@ -192,9 +192,7 @@ class TestKeyDerivation:
         assert first_key == second_key
 
     def test_labels_produce_independent_keys(self) -> None:
-        assert derive_key(ROOT_KEY_MATERIAL, b"jwt") != derive_key(
-            ROOT_KEY_MATERIAL, b"settings"
-        )
+        assert derive_key(ROOT_KEY_MATERIAL, b"jwt") != derive_key(ROOT_KEY_MATERIAL, b"settings")
 
     def test_different_roots_produce_different_keys(self) -> None:
         assert derive_key(ROOT_KEY_MATERIAL, b"a") != derive_key("f" * 32, b"a")

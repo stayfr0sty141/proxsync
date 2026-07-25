@@ -71,5 +71,5 @@ def enum_check(column: str, enum_cls: type[StrEnum], *, constraint: str) -> Chec
     Values are rendered with `repr`, which produces SQL-safe single-quoted literals for the
     identifier-like strings these enums contain.
     """
-    values = ", ".join(repr(member.value) for member in enum_cls)
+    values = ", ".join(repr(member.value) for member in enum_cls.__members__.values())
     return CheckConstraint(f"{column} IN ({values})", name=constraint)
