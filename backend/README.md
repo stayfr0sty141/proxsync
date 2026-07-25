@@ -147,7 +147,7 @@ Configuration reference: [.env.example](.env.example).
 ## Development
 
 ```bash
-python3.13 -m venv .venv && .venv/bin/pip install -e ".[dev]" httpx2
+python3.13 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest                # 659 tests, no Proxmox host required
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy app tests        # strict

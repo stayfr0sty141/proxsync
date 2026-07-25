@@ -18,7 +18,7 @@ help: ## Show available targets
 agent-install: ## Create the agent virtualenv and install dependencies
 	python3 -m venv $(AGENT_VENV)
 	$(AGENT_VENV)/bin/pip install --upgrade pip
-	cd agent && .venv/bin/pip install -e ".[dev]" httpx2
+	cd agent && .venv/bin/pip install -e ".[dev]"
 
 agent-test: ## Run the agent test suite
 	cd agent && .venv/bin/pytest -q
@@ -40,7 +40,7 @@ agent-run: ## Run the agent locally (no TLS; development only)
 backend-install: ## Create the backend virtualenv and install dependencies
 	$(BACKEND_PYTHON) -m venv $(BACKEND_VENV)
 	$(BACKEND_VENV)/bin/pip install --upgrade pip
-	cd backend && .venv/bin/pip install -e ".[dev]" httpx2
+	cd backend && .venv/bin/pip install -e ".[dev]"
 
 backend-test: ## Run the backend test suite
 	cd backend && .venv/bin/pytest -q
