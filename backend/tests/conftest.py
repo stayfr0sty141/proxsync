@@ -330,9 +330,9 @@ def verify_agent_signature(recorded: RecordedRequest, *, secret: str = AGENT_SEC
         f"{hashlib.sha256(recorded.content).hexdigest()}"
     )
     expected = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
-    assert hmac.compare_digest(
-        expected, recorded.headers["x-proxsync-signature"]
-    ), "agent signature does not verify"
+    assert hmac.compare_digest(expected, recorded.headers["x-proxsync-signature"]), (
+        "agent signature does not verify"
+    )
     assert abs(time.time() - float(timestamp)) < 60, "timestamp outside the agent's window"
     assert len(nonce) >= 8
 
