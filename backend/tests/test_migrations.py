@@ -10,12 +10,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Connection, create_engine
-
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from sqlalchemy import Connection, create_engine
+
 from app.core.config import Settings
 from app.db.models import Base
 
